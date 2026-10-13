@@ -108,6 +108,17 @@ public class WakeWordPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Tono corto que indica "ya puede hablar". */
+    @PluginMethod
+    public void beep(PluginCall call) {
+        try {
+            final android.media.ToneGenerator tg = new android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 70);
+            tg.startTone(android.media.ToneGenerator.TONE_PROP_BEEP, 120);
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(tg::release, 300);
+        } catch (RuntimeException ignored) {}
+        call.resolve();
+    }
+
     @PluginMethod
     public void status(PluginCall call) {
         JSObject o = new JSObject();

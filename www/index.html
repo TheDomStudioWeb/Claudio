@@ -322,7 +322,10 @@ function checkDone(){
   if (pending > 0 || !streamDone) return;
   pending = 0;
   if (document.body.dataset.state !== 'error') setState('idle');
-  if (cfg.converse && !stopped) setTimeout(() => { if (!stopped && document.body.dataset.state === 'idle') listen(); }, 400);
+  if (cfg.converse && !stopped){
+    clearTimeout(setState._r); // la conversación sigue: no reactivar la escucha del nombre
+    setTimeout(() => { if (!stopped && document.body.dataset.state === 'idle') listen(); }, 650);
+  }
 }
 function stopAll(){
   stopped = true; gen++;
@@ -343,30 +346,52 @@ function flushSentences(buf){
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, listening = false;
 
-async function listenNative(){
+let finishListen = null;
+async function listenNative(opts = {}){
   if (listening) return;
+  listening = true;               // bloquea antes de cualquier espera
+  clearTimeout(setState._r);      // que la escucha de "Claudio" no retome el micrófono
   stopAll(); stopped = false;
   try {
     let p = await NSR.checkPermissions();
     if (p.speechRecognition !== 'granted') p = await NSR.requestPermissions();
-    if (p.speechRecognition !== 'granted'){ toast('Necesito permiso para usar el micrófono.'); return; }
+    if (p.speechRecognition !== 'granted'){ listening = false; toast('Necesito permiso para usar el micrófono.'); return; }
   } catch {}
-  if (WK && cfg.wake){ try { await WK.pause(); } catch {} }
-  listening = true; setState('listening'); capUser('…');
-  try {
-    const r = await NSR.start({language: 'es-AR', maxResults: 1, partialResults: false, popup: false});
+  if (WK){ try { await WK.pause(); } catch {} }
+  if (opts.beep !== false && WK){ try { await WK.beep(); } catch {} await new Promise(r => setTimeout(r, 180)); }
+  setState('listening'); capUser('Lo escucho…');
+
+  let last = '', heard = false, done = false, guard = null, h1 = null, h2 = null;
+  const arm = ms => { clearTimeout(guard); guard = setTimeout(() => finish(), ms); };
+  const finish = () => {
+    if (done) return; done = true; finishListen = null;
+    clearTimeout(guard);
+    if (h1) h1.remove(); if (h2) h2.remove();
+    NSR.stop().catch(() => {});
     listening = false;
-    const t = ((r && r.matches && r.matches[0]) || '').trim();
+    const t = last.trim();
     if (t) ask(t); else { capUser(''); setState('idle'); }
+  };
+  finishListen = finish;
+  try {
+    h1 = await NSR.addListener('partialResults', d => {
+      const m = d && d.matches && d.matches[0];
+      if (m){ last = m; heard = true; capUser(m); arm(2500); }
+    });
+    h2 = await NSR.addListener('listeningState', d => {
+      if (d && d.status === 'stopped') arm(heard ? 900 : 1500);
+    });
+    arm(8000); // si no habla en 8 segundos, deja de escuchar
+    await NSR.start({language: 'es-AR', maxResults: 1, partialResults: true, popup: false});
   } catch (e){
-    listening = false; capUser(''); setState('idle');
     const m = String((e && e.message) || e);
     if (!/match|speech input|timeout|busy/i.test(m)) toast('Micrófono: ' + m);
+    finish();
   }
 }
 
-function listen(){
-  if (NATIVE) return listenNative();
+function listen(opts){
+  if (NATIVE) return listenNative(opts);
   if (!SR){ toast('Este navegador no tiene reconocimiento de voz. Use Chrome o Edge, o escriba abajo.'); return; }
   if (listening) return;
   stopAll(); stopped = false;
@@ -477,7 +502,7 @@ async function ask(text){
 
 /* ---------- Controles ---------- */
 function micAction(){
-  if (listening){ if (NATIVE) NSR.stop().catch(() => {}); else if (rec) rec.stop(); return; }
+  if (listening){ if (NATIVE){ if (finishListen) finishListen(); } else if (rec) rec.stop(); return; }
   const s = document.body.dataset.state;
   if (s === 'speaking' || s === 'thinking'){ stopAll(); setState('idle'); return; }
   listen();
@@ -560,7 +585,7 @@ if (WK){
   WK.addListener('wake', () => {
     bootDone(false);
     if (listening || ['thinking', 'speaking'].includes(document.body.dataset.state)) return;
-    listen();
+    listen({beep: false}); // el servicio ya hizo sonar el tono
   });
   WK.addListener('error', d => toast('Activación por voz: ' + (d && d.message), 5000));
   document.addEventListener('visibilitychange', () => { if (!document.hidden && $('#cfgSheet').classList.contains('open')) refreshWakeUi(); });
