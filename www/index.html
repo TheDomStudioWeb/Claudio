@@ -618,6 +618,18 @@ async function callClaude(messages, onText){
   return {blocks: blocks.filter(b => b && !(b.type === 'text' && !b.text)), stop};
 }
 
+function explainError(msg){
+  const m = String(msg || '').toLowerCase();
+  if (/credit balance|billing|purchase credits/.test(m)) return 'Se agotó el crédito de la cuenta de Anthropic. Hay que cargar saldo en la consola.';
+  if (/invalid x-api-key|authentication|401/.test(m)) return 'La clave de API no es válida. Revísela en Protocolos.';
+  if (/not_found|model/.test(m) && /not found|does not exist|invalid model/.test(m)) return 'El modelo elegido no está disponible. Elija otro núcleo en Protocolos.';
+  if (/rate|429/.test(m)) return 'Recibí demasiadas consultas seguidas. Espere un minuto y vuelva a intentar.';
+  if (/overloaded|529|5\d\d/.test(m)) return 'Los servidores de Anthropic están saturados en este momento. Pruebe de nuevo en unos minutos.';
+  if (/failed to fetch|network|load failed/.test(m)) return 'No tengo conexión a internet o la señal es muy débil.';
+  if (/tool|web_search/.test(m)) return 'Falló la búsqueda web. Pruebe desactivándola en Protocolos.';
+  return 'Tuve un problema de conexión con mis sistemas.';
+}
+
 async function ask(text){
   if (!cfg.key){ toast('Primero configure su clave de API en Protocolos.'); openSheet('#cfgSheet'); return; }
   stopAll(); stopped = false;
@@ -652,9 +664,9 @@ async function ask(text){
     } else {
       history.pop();
       setState('error');
-      const m = 'Disculpe, ' + (cfg.name || 'señor') + '. Hubo una falla: ' + e.message;
-      capBot(m);
-      speak('Disculpe, tuve un problema de conexión con mis sistemas.');
+      const why = explainError(e.message);
+      capBot('Disculpe, ' + (cfg.name || 'señor') + '. ' + why + '\n\nDetalle técnico: ' + e.message);
+      speak('Disculpe. ' + why);
       stopped = true;
       setTimeout(() => { if (document.body.dataset.state === 'error') setState('idle'); }, 4000);
     }
@@ -703,7 +715,7 @@ $('#hud').onclick = micAction;
 $('#form').onsubmit = e => { e.preventDefault(); const t = $('#txt').value.trim(); if (!t) return; $('#txt').value = ''; $('#txt').blur(); ask(t); };
 
 function openSheet(id){
-  if (id === '#cfgSheet') fillCfg();
+  if (id === '#cfgSheet'){ fillCfg(); loadVoices(); } // las voces de Android pueden cargar tarde
   if (id === '#logSheet') renderLog();
   if (id === '#pplSheet') renderPeople();
   $(id).classList.add('open');
