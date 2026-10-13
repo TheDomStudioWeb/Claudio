@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#02070d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>J.A.R.V.I.S.</title>
+<title>Claudio</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -123,7 +123,7 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
 
 <header>
   <div>
-    <div class="brand">J.A.R.V.I.S.</div>
+    <div class="brand" id="brand">CLAUDIO</div>
     <div class="status"><i></i><span id="status">En línea</span></div>
   </div>
   <div class="hdr-r">
@@ -145,7 +145,7 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
       <g class="r4"><circle class="s" cx="150" cy="150" r="84" stroke-width="5" stroke-dasharray="110 20 40 20 60 20" opacity=".9"/></g>
       <g class="r5"><circle class="s" cx="150" cy="150" r="70" stroke-width="1.5" stroke-dasharray="30 10" opacity=".7"/></g>
       <circle class="core" cx="150" cy="150" r="52"/>
-      <text class="core-label" x="150" y="153" text-anchor="middle">JARVIS</text>
+      <text class="core-label" id="coreLabel" x="150" y="153" text-anchor="middle">CLAUDIO</text>
     </svg>
   </div>
 
@@ -157,7 +157,7 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
 
 <footer>
   <form class="input" id="form" autocomplete="off">
-    <input id="txt" placeholder="Escribir a JARVIS…" enterkeyhint="send">
+    <input id="txt" placeholder="Escribir a Claudio…" enterkeyhint="send">
     <button class="send" aria-label="Enviar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
   </form>
   <button class="mic" id="mic" aria-label="Hablar">
@@ -182,13 +182,17 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
     </select>
   </div>
   <div class="field">
-    <label>¿Cómo debo llamarlo?</label>
+    <label>Nombre del asistente</label>
+    <input type="text" id="cAName" placeholder="Claudio">
+  </div>
+  <div class="field">
+    <label>¿Cómo debo llamarlo a usted?</label>
     <input type="text" id="cName" placeholder="señor">
   </div>
   <div class="field">
     <label>Contexto personal</label>
     <textarea id="cCtx" placeholder="Ej: Vivo en Mendoza, Argentina. Dirijo un estudio de desarrollo web. Prefiero respuestas directas."></textarea>
-    <small>JARVIS lo tendrá presente en todas las respuestas.</small>
+    <small>El asistente lo tendrá presente en todas las respuestas.</small>
   </div>
   <div class="field">
     <label>Voz</label>
@@ -200,6 +204,23 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
   </div>
   <label class="toggle"><div><span>Conversación continua</span><small>Vuelve a escuchar al terminar de hablar</small></div><input type="checkbox" id="cConv"></label>
   <label class="toggle"><div><span>Búsqueda web</span><small>Para noticias, clima, precios y datos actuales</small></div><input type="checkbox" id="cWeb"></label>
+  <div id="wakeBox" style="display:none">
+    <label class="toggle"><div><span>Activación por voz</span><small id="wakeHint">Diga el nombre y empieza a escuchar, incluso con la app en segundo plano</small></div><input type="checkbox" id="cWake"></label>
+    <div class="field">
+      <label>AccessKey de Picovoice</label>
+      <input type="password" id="cPvKey" placeholder="Pegue su AccessKey">
+      <small>Gratis para uso personal en <a href="https://console.picovoice.ai/" target="_blank" rel="noopener">console.picovoice.ai</a>.</small>
+    </div>
+    <div class="field">
+      <label>Palabra de activación (.ppn)</label>
+      <input type="file" id="cPpn" accept=".ppn,application/octet-stream" style="color:var(--muted);font:500 15px Rajdhani">
+      <small id="ppnState">En Picovoice Console: Porcupine → idioma Español → escriba "Claudio" → plataforma Android → descargue el .ppn y cárguelo acá.</small>
+    </div>
+    <div class="field"><label>Sensibilidad <span id="vSens"></span></label><input type="range" id="cSens" min=".3" max=".9" step=".05">
+      <small>Más alta: lo escucha mejor, pero se activa más por error.</small></div>
+    <div class="btns" style="margin-top:4px"><button class="btn ghost" id="btnOverlay">Permitir abrir sobre otras apps</button></div>
+    <small id="overlayState" style="display:block;color:var(--muted);font-size:13px;margin-top:6px">Necesario para que la app se abra sola cuando la llame desde otra pantalla.</small>
+  </div>
   <div class="btns">
     <button class="btn ghost" id="testVoice">Probar voz</button>
     <button class="btn ghost" id="clearHist">Borrar memoria</button>
@@ -223,8 +244,9 @@ const CAP = window.Capacitor;
 const NATIVE = !!(CAP && CAP.isNativePlatform && CAP.isNativePlatform());
 const NSR = NATIVE ? CAP.registerPlugin('SpeechRecognition') : null;
 const NTTS = NATIVE ? CAP.registerPlugin('TextToSpeech') : null;
+const WK = NATIVE ? CAP.registerPlugin('WakeWord') : null;
 let gen = 0; // se incrementa en cada interrupción para ignorar callbacks viejos
-const DEF = {key:'', model:'claude-sonnet-5-5', name:'señor', ctx:'', voice:'', rate:1.05, pitch:.9, converse:true, web:false};
+const DEF = {key:'', model:'claude-sonnet-5-5', aname:'Claudio', name:'señor', ctx:'', voice:'', rate:1.05, pitch:.9, converse:true, web:false, wake:false, pvKey:'', sens:.6};
 let cfg = DEF;
 try { cfg = {...DEF, ...JSON.parse(localStorage.getItem('jarvis.cfg') || '{}')}; } catch {}
 let history = [];
@@ -235,7 +257,17 @@ const saveHist = () => { try { localStorage.setItem('jarvis.hist', JSON.stringif
 
 /* ---------- Estado e interfaz ---------- */
 const LABEL = {idle:'En línea', listening:'Escuchando', thinking:'Procesando', speaking:'Respondiendo', error:'Falla'};
-function setState(s){ document.body.dataset.state = s; $('#status').textContent = LABEL[s] || s; }
+function setState(s){
+  document.body.dataset.state = s; $('#status').textContent = LABEL[s] || s;
+  clearTimeout(setState._r);
+  if (s === 'idle' && WK && cfg.wake) setState._r = setTimeout(() => { if (document.body.dataset.state === 'idle' && !listening) WK.resume().catch(() => {}); }, 900);
+}
+const AN = () => cfg.aname || 'Claudio';
+function applyName(){
+  const n = AN();
+  document.title = n; $('#brand').textContent = n.toUpperCase(); $('#coreLabel').textContent = n.toUpperCase().slice(0, 9);
+  $('#txt').placeholder = 'Escribir a ' + n + '…';
+}
 function toast(m, ms = 3500){ const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', ms); }
 function capUser(t){ $('#capUser').textContent = t ? '« ' + t + ' »' : ''; }
 function capBot(t){ $('#capBot').textContent = t; const c = $('#caption'); c.scrollTop = c.scrollHeight; }
@@ -329,6 +361,7 @@ async function listenNative(){
     if (p.speechRecognition !== 'granted') p = await NSR.requestPermissions();
     if (p.speechRecognition !== 'granted'){ toast('Necesito permiso para usar el micrófono.'); return; }
   } catch {}
+  if (WK && cfg.wake){ try { await WK.pause(); } catch {} }
   listening = true; setState('listening'); capUser('…');
   try {
     const r = await NSR.start({language: 'es-AR', maxResults: 1, partialResults: false, popup: false});
@@ -373,8 +406,8 @@ function listen(){
 function systemPrompt(){
   const now = new Date().toLocaleString('es-AR', {dateStyle:'full', timeStyle:'short'});
   const name = cfg.name || 'señor';
-  return `Sos J.A.R.V.I.S. (Just A Rather Very Intelligent System), el asistente personal de inteligencia artificial de tu usuario, a quien llamás "${name}".
-Personalidad: inspirado en el JARVIS de Tony Stark. Leal, sereno, extremadamente competente y anticipatorio. Ingenio seco y sutil, de mayordomo británico, que aparece de vez en cuando sin restar utilidad. Nunca servil ni empalagoso. Si una idea es mala o riesgosa, lo decís con elegancia y franqueza.
+  return `Sos ${AN()}, el asistente personal de inteligencia artificial de tu usuario, a quien llamás "${name}". Si te preguntan, tu nombre es ${AN()}.
+Personalidad: inspirada en J.A.R.V.I.S., el asistente de Tony Stark. Leal, sereno, extremadamente competente y anticipatorio. Ingenio seco y sutil, de mayordomo británico, que aparece de vez en cuando sin restar utilidad. Nunca servil ni empalagoso. Si una idea es mala o riesgosa, lo decís con elegancia y franqueza.
 Idioma: español, trato de usted, cálido y preciso.
 Tus respuestas se escuchan en voz alta, así que:
 - Por defecto sé breve: una a cuatro oraciones. Extendete solo si te piden detalle o explicación.
@@ -473,37 +506,100 @@ $('#btnCfg').onclick = () => openSheet('#cfgSheet');
 $('#btnLog').onclick = () => openSheet('#logSheet');
 
 function fillCfg(){
-  $('#cKey').value = cfg.key; $('#cModel').value = cfg.model; $('#cName').value = cfg.name; $('#cCtx').value = cfg.ctx;
+  $('#cKey').value = cfg.key; $('#cAName').value = cfg.aname; $('#cWake').checked = cfg.wake; $('#cPvKey').value = cfg.pvKey; $('#cSens').value = cfg.sens; refreshWakeUi(); $('#cModel').value = cfg.model; $('#cName').value = cfg.name; $('#cCtx').value = cfg.ctx;
   $('#cVoice').value = cfg.voice; $('#cRate').value = cfg.rate; $('#cPitch').value = cfg.pitch;
   $('#cConv').checked = cfg.converse; $('#cWeb').checked = cfg.web; updRanges();
 }
 function readCfg(){
-  cfg = {...cfg, key: $('#cKey').value.trim(), model: $('#cModel').value, name: $('#cName').value.trim() || 'señor',
+  cfg = {...cfg, aname: $('#cAName').value.trim() || 'Claudio', wake: $('#cWake').checked, pvKey: $('#cPvKey').value.trim(), sens: +$('#cSens').value, key: $('#cKey').value.trim(), model: $('#cModel').value, name: $('#cName').value.trim() || 'señor',
     ctx: $('#cCtx').value.trim(), voice: $('#cVoice').value, rate: +$('#cRate').value, pitch: +$('#cPitch').value,
     converse: $('#cConv').checked, web: $('#cWeb').checked};
 }
-function updRanges(){ $('#vRate').textContent = (+$('#cRate').value).toFixed(2); $('#vPitch').textContent = (+$('#cPitch').value).toFixed(2); }
-$('#cRate').oninput = $('#cPitch').oninput = updRanges;
+function updRanges(){ $('#vSens').textContent = (+$('#cSens').value).toFixed(2); $('#vRate').textContent = (+$('#cRate').value).toFixed(2); $('#vPitch').textContent = (+$('#cPitch').value).toFixed(2); }
+$('#cRate').oninput = $('#cPitch').oninput = $('#cSens').oninput = updRanges;
 $('#testVoice').onclick = () => { readCfg(); stopAll(); speak('A su servicio, ' + cfg.name + '. Todos los sistemas operativos.'); };
 $('#clearHist').onclick = () => { history = []; saveHist(); toast('Memoria de conversación borrada.'); };
-$('#saveCfg').onclick = () => { readCfg(); saveCfg(); $('#cfgSheet').classList.remove('open'); toast('Protocolos actualizados.', 2000); };
+$('#saveCfg').onclick = async () => { readCfg(); saveCfg(); applyName(); $('#cfgSheet').classList.remove('open'); toast('Protocolos actualizados.', 2000); await syncWake(true); };
 
 /* ---------- Arranque ---------- */
 const BOOT = ['> Inicializando núcleo de IA…', '> Calibrando sintetizador de voz…', '> Enlazando reconocimiento de voz…', '> Cargando protocolos personales…', '> Todos los sistemas en línea.'];
+BOOT[0] = '> Inicializando ' + (cfg.aname || 'Claudio') + '…';
 (async () => { const el = $('#bootLog'); for (const l of BOOT){ el.textContent += l + '\n'; await new Promise(r => setTimeout(r, 380)); } })();
 
 function greeting(){
   const h = new Date().getHours();
   const g = h < 6 ? 'Buenas noches' : h < 13 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
-  return `${g}, ${cfg.name || 'señor'}. JARVIS en línea. ¿En qué puedo asistirle?`;
+  return `${g}, ${cfg.name || 'señor'}. ${AN()} en línea. ¿En qué puedo asistirle?`;
 }
-$('#boot').onclick = () => {
+function bootDone(withGreeting){
+  if ($('#boot').classList.contains('hide')) return;
   $('#boot').classList.add('hide');
   stopped = true; // el saludo no abre el micrófono solo
-  const g = greeting(); capBot(g); speak(g);
+  const g = greeting(); capBot(g);
+  if (withGreeting) speak(g);
   if (!cfg.key) setTimeout(() => openSheet('#cfgSheet'), 2600);
   if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
-};
+}
+$('#boot').onclick = () => bootDone(true);
+
+/* ---------- Activación por voz (solo APK) ---------- */
+async function refreshWakeUi(){
+  if (!WK) return;
+  $('#wakeHint').textContent = 'Diga "' + AN() + '" y empieza a escuchar, incluso con la app en segundo plano';
+  try {
+    const st = await WK.status();
+    $('#ppnState').textContent = st.hasKeyword
+      ? 'Palabra de activación cargada ✓ (puede reemplazarla eligiendo otro archivo)'
+      : 'En Picovoice Console: Porcupine → idioma Español → escriba "' + AN() + '" → plataforma Android → descargue el .ppn y cárguelo acá.';
+    $('#overlayState').textContent = st.canOverlay
+      ? 'Permiso para abrirse sobre otras apps concedido ✓'
+      : 'Necesario para que la app se abra sola cuando la llame desde otra pantalla.';
+  } catch {}
+}
+async function syncWake(verbose){
+  if (!WK) return;
+  try {
+    if (cfg.wake){
+      await WK.start({accessKey: cfg.pvKey, sensitivity: cfg.sens, name: AN()});
+      if (verbose) toast('Escuchando la palabra "' + AN() + '".', 2500);
+    } else await WK.stop();
+  } catch (e){
+    toast('Activación por voz: ' + ((e && e.message) || e), 5000);
+  }
+}
+if (WK){
+  $('#wakeBox').style.display = 'block';
+  $('#cPpn').onchange = e => {
+    const f = e.target.files && e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = async () => {
+      try {
+        await WK.saveKeyword({base64: String(r.result).split(',')[1]});
+        toast('Palabra de activación guardada.', 2000);
+        refreshWakeUi();
+      } catch (err){ toast('No pude guardar el archivo: ' + ((err && err.message) || err)); }
+    };
+    r.readAsDataURL(f);
+  };
+  $('#btnOverlay').onclick = () => WK.openOverlaySettings().catch(() => {});
+  WK.addListener('wake', () => {
+    bootDone(false);
+    if (listening || ['thinking', 'speaking'].includes(document.body.dataset.state)) return;
+    listen();
+  });
+  WK.addListener('error', d => toast('Activación por voz: ' + (d && d.message), 5000));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && $('#cfgSheet').classList.contains('open')) refreshWakeUi(); });
+}
+
+applyName();
+if (NATIVE){
+  // En la app no hace falta tocar para iniciar: Android no exige un gesto para hablar.
+  setTimeout(() => bootDone(false), 2200);
+  (async () => {
+    await syncWake(false);
+    try { const r = await WK.consumeWake(); if (r && r.wake){ bootDone(false); listen(); } } catch {}
+  })();
+}
 
 if (!NATIVE && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>

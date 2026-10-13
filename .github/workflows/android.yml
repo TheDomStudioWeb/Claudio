@@ -51,20 +51,20 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
-          cp app/build/outputs/apk/debug/app-debug.apk ../JARVIS.apk
+          cp app/build/outputs/apk/debug/app-debug.apk ../Claudio.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: JARVIS-apk
-          path: JARVIS.apk
+          name: Claudio-apk
+          path: Claudio.apk
 
       - name: Publicar en Releases
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete apk --yes --cleanup-tag || true
-          gh release create apk JARVIS.apk \
+          gh release create apk Claudio.apk \
             --target "${{ github.sha }}" \
-            --title "JARVIS — última versión" \
+            --title "Claudio — última versión" \
             --notes "APK compilada automáticamente desde ${GITHUB_SHA::7}. Descargala desde el teléfono e instalala." \
             --latest

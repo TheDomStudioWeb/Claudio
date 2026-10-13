@@ -1,6 +1,7 @@
-# J.A.R.V.I.S. — asistente personal de voz
+# Claudio — asistente personal de voz
 
-Asistente de voz con IA (Claude) inspirado en el JARVIS de Tony Stark.
+Asistente de voz con IA (Claude) inspirado en J.A.R.V.I.S., el asistente de Tony Stark.
+El nombre es configurable desde Protocolos.
 Un mismo código, dos formas de usarlo:
 
 - **App Android (APK)** — usa el reconocimiento y la voz nativos de Android.
@@ -8,12 +9,21 @@ Un mismo código, dos formas de usarlo:
 
 ## Descargar la app
 Cada cambio en `main` compila la APK automáticamente (GitHub Actions) y la publica en
-**Releases → "JARVIS — última versión"**. Descargá `JARVIS.apk` desde el teléfono,
+**Releases → "Claudio — última versión"**. Descargá `Claudio.apk` desde el teléfono,
 permití "instalar apps de origen desconocido" e instalala.
 
 ## Configuración inicial
 ⚙ Protocolos → pegá tu clave de API de [console.anthropic.com](https://console.anthropic.com/settings/keys) → Guardar.
 Ahí también elegís voz, velocidad, tono, modelo y tu contexto personal.
+
+## Activación por voz ("Claudio")
+Solo en la app Android. Escucha la palabra sin conexión con Picovoice Porcupine (gratis para uso personal).
+1. Creá una cuenta en [console.picovoice.ai](https://console.picovoice.ai/) y copiá tu **AccessKey**.
+2. En Porcupine: idioma **Español**, escribí **Claudio**, entrená, elegí plataforma **Android** y descargá el `.ppn`.
+3. En la app: ⚙ Protocolos → Activación por voz → pegá la AccessKey, cargá el `.ppn`, activá y guardá.
+4. Tocá **"Permitir abrir sobre otras apps"** para que se abra sola desde cualquier pantalla.
+
+Mientras está atento, Android muestra una notificación fija. Al detectar el nombre suena un tono y empieza a escucharte.
 
 ## Estructura
 | Carpeta | Qué es |
