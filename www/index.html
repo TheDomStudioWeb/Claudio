@@ -60,6 +60,14 @@ body[data-state=speaking] .r4{animation-duration:5s}
 .cap-user{color:var(--muted);font-size:15px;margin-bottom:8px;min-height:1em}
 .cap-bot{font-size:20px;line-height:1.35;font-weight:500;color:var(--txt);white-space:pre-wrap}
 .cap-hint{color:var(--muted);font-size:15px;letter-spacing:.06em}
+.who{margin-top:8px;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--c);border:1px solid var(--dim);border-radius:999px;padding:4px 12px;display:none;cursor:pointer;background:rgba(6,25,38,.6)}
+.who.show{display:inline-block}
+.pcard{border:1px solid var(--dim);border-radius:12px;padding:12px 14px;background:rgba(6,25,38,.6);margin-bottom:10px}
+.pcard h3{margin:0 0 4px;font:600 18px Rajdhani;color:var(--txt);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.pcard p{margin:2px 0;color:var(--muted);font-size:15px;line-height:1.35}
+.pcard ul{margin:6px 0 0;padding-left:18px;color:var(--txt);font-size:15px}
+.del{background:none;border:1px solid var(--dim);color:var(--muted);border-radius:8px;padding:3px 9px;font:500 13px Rajdhani;cursor:pointer}
+.sec{font-family:Orbitron;font-size:12px;letter-spacing:.2em;color:var(--muted);margin:18px 0 10px}
 
 footer{display:flex;gap:10px;align-items:center;padding:10px 16px 14px;max-width:660px;width:100%;margin:0 auto}
 .input{flex:1;display:flex;align-items:center;border:1px solid var(--dim);border-radius:14px;background:rgba(6,25,38,.7);padding:0 6px 0 14px;height:52px}
@@ -127,6 +135,7 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
     <div class="status"><i></i><span id="status">En línea</span></div>
   </div>
   <div class="hdr-r">
+    <button class="icon-btn" id="btnPpl" aria-label="Personas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.9.3 5 2.7 5 5.8"/></svg></button>
     <button class="icon-btn" id="btnLog" aria-label="Historial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
     <button class="icon-btn" id="btnCfg" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </div>
@@ -148,6 +157,7 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
       <text class="core-label" id="coreLabel" x="150" y="153" text-anchor="middle">CLAUDIO</text>
     </svg>
   </div>
+  <div class="who" id="who" title="Tocar para volver a usted"></div>
 
   <div class="caption" id="caption">
     <div class="cap-user" id="capUser"></div>
@@ -186,6 +196,11 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
     <input type="text" id="cAName" placeholder="Claudio">
   </div>
   <div class="field">
+    <label>Su nombre</label>
+    <input type="text" id="cOwner" placeholder="Ej: Daniel">
+    <small>Así sabe que es usted cuando dice "soy …" o "vuelvo yo".</small>
+  </div>
+  <div class="field">
     <label>¿Cómo debo llamarlo a usted?</label>
     <input type="text" id="cName" placeholder="señor">
   </div>
@@ -213,9 +228,18 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
   </div>
   <div class="btns">
     <button class="btn ghost" id="testVoice">Probar voz</button>
-    <button class="btn ghost" id="clearHist">Borrar memoria</button>
+    <button class="btn ghost" id="clearHist">Borrar conversación</button>
     <button class="btn" id="saveCfg">Guardar</button>
   </div>
+</div></div>
+
+<!-- Personas -->
+<div class="sheet" id="pplSheet"><div class="panel">
+  <h2>PERSONAS <button class="icon-btn" data-close aria-label="Cerrar">✕</button></h2>
+  <p style="color:var(--muted);font-size:15px;margin:-6px 0 14px;line-height:1.4">Preséntele gente hablando ("te presento a Laura, mi esposa"). Quien le hable debe decir "hola, te habla …" para que sepa con quién conversa.</p>
+  <div id="pplList"></div>
+  <div class="sec">DATOS GUARDADOS</div>
+  <div id="factList"></div>
 </div></div>
 
 <!-- Historial -->
@@ -236,7 +260,7 @@ const NSR = NATIVE ? CAP.registerPlugin('SpeechRecognition') : null;
 const NTTS = NATIVE ? CAP.registerPlugin('TextToSpeech') : null;
 const WK = NATIVE ? CAP.registerPlugin('WakeWord') : null;
 let gen = 0; // se incrementa en cada interrupción para ignorar callbacks viejos
-const DEF = {key:'', model:'claude-sonnet-5-5', aname:'Claudio', name:'señor', ctx:'', voice:'', rate:1.05, pitch:.9, converse:true, web:false, wake:false, pvKey:'', sens:.6};
+const DEF = {key:'', model:'claude-sonnet-5-5', aname:'Claudio', owner:'', name:'señor', ctx:'', voice:'', rate:1.05, pitch:.9, converse:true, web:false, wake:false, pvKey:'', sens:.6};
 let cfg = DEF;
 try { cfg = {...DEF, ...JSON.parse(localStorage.getItem('jarvis.cfg') || '{}')}; } catch {}
 let history = [];
@@ -265,7 +289,7 @@ function capBot(t){ $('#capBot').textContent = t; const c = $('#caption'); c.scr
 function renderLog(){
   const el = $('#log'); el.innerHTML = '';
   if (!history.length){ el.innerHTML = '<div class="empty">Sin registros todavía.</div>'; return; }
-  for (const m of history){ const d = document.createElement('div'); d.className = 'bub ' + (m.role === 'user' ? 'user' : 'bot'); d.textContent = m.content; el.appendChild(d); }
+  for (const m of history){ const d = document.createElement('div'); d.className = 'bub ' + (m.role === 'user' ? 'user' : 'bot'); d.textContent = (m.role === 'user' && m.who && m.who !== ownerLabel() ? m.who + ': ' : '') + m.content; el.appendChild(d); }
   el.parentElement.parentElement.scrollTop = 1e6;
 }
 
@@ -418,69 +442,209 @@ function listen(opts){
 }
 
 /* ---------- Cerebro ---------- */
+/* ---------- Memoria de personas ---------- */
+let mem = {people:{}, facts:[], speaker:null, lastAt:0};
+try { mem = {...mem, ...JSON.parse(localStorage.getItem('claudio.mem') || '{}')}; } catch {}
+const saveMem = () => { try { localStorage.setItem('claudio.mem', JSON.stringify(mem)); } catch {} };
+const norm = t => String(t || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const ownerLabel = () => cfg.owner || 'el usuario';
+const isOwnerName = n => cfg.owner && norm(n).split(/\s+/)[0] === norm(cfg.owner).split(/\s+/)[0];
+function findPerson(n){
+  const k = norm(n); if (!k) return null;
+  if (mem.people[k]) return mem.people[k];
+  const first = k.split(/\s+/)[0];
+  return Object.values(mem.people).find(p => norm(p.name).split(/\s+/)[0] === first) || null;
+}
+function speakerLabel(){ const p = mem.speaker && mem.people[mem.speaker]; return p ? p.name : ownerLabel(); }
+function renderWho(){
+  const p = mem.speaker && mem.people[mem.speaker];
+  const w = $('#who'); w.textContent = p ? 'Hablando con ' + p.name : ''; w.classList.toggle('show', !!p);
+}
+
+const TOOLS = [
+  {name:'establecer_interlocutor',
+   description:'Llamala cada vez que cambie quién te está hablando: alguien se presenta ("hola, te habla X", "soy X"), el usuario avisa que ahora habla otra persona, o el usuario dice que vuelve él ("vuelvo yo", "soy ' + '<nombre del usuario>"). Para el propio usuario usá es_usuario=true.',
+   input_schema:{type:'object', properties:{nombre:{type:'string', description:'Nombre de quien habla ahora'}, es_usuario:{type:'boolean'}}, required:['nombre']}},
+  {name:'guardar_persona',
+   description:'Crea o actualiza la ficha permanente de una persona: cuando el usuario te la presenta, o cuando aprendés algo duradero de ella (relación con el usuario, cómo tratarla, un dato útil).',
+   input_schema:{type:'object', properties:{
+     nombre:{type:'string'},
+     relacion:{type:'string', description:'Relación con el usuario. Ej: esposa, jefe de ventas, jefe'},
+     trato:{type:'string', description:'Cómo dirigirte a ella. Ej: tutearla y llamarla Lau; de usted y formal'},
+     dato:{type:'string', description:'Un dato nuevo y concreto para recordar sobre ella'}}, required:['nombre']}},
+  {name:'recordar',
+   description:'Guarda un dato duradero que el usuario te pide recordar o que le será útil en el futuro. Para datos de una persona puntual usá guardar_persona.',
+   input_schema:{type:'object', properties:{dato:{type:'string'}}, required:['dato']}},
+  {name:'olvidar',
+   description:'Borra lo que el usuario te pida olvidar: una persona completa, o un dato (de una persona o general).',
+   input_schema:{type:'object', properties:{persona:{type:'string', description:'Nombre, si se olvida a una persona o un dato suyo'}, dato:{type:'string', description:'Texto aproximado del dato a borrar; vacío para borrar a la persona entera'}}}}
+];
+
+function runTool(name, input){
+  input = input || {};
+  try {
+    if (name === 'establecer_interlocutor'){
+      if (input.es_usuario || isOwnerName(input.nombre)){ mem.speaker = null; saveMem(); renderWho(); return 'Ahora habla el usuario.'; }
+      let p = findPerson(input.nombre);
+      if (!p){ p = {name: String(input.nombre).trim(), relation:'', treatment:'', notes:[], met: Date.now()}; mem.people[norm(p.name)] = p; }
+      mem.speaker = norm(p.name); saveMem(); renderWho();
+      return p.relation || p.treatment || p.notes.length
+        ? 'Ahora habla ' + p.name + '. Ficha: ' + JSON.stringify({relacion:p.relation, trato:p.treatment, datos:p.notes})
+        : 'Ahora habla ' + p.name + ', persona nueva sin ficha todavía.';
+    }
+    if (name === 'guardar_persona'){
+      if (isOwnerName(input.nombre)) return 'Ese es el usuario; para datos suyos usá recordar.';
+      let p = findPerson(input.nombre);
+      if (!p){ p = {name: String(input.nombre).trim(), relation:'', treatment:'', notes:[], met: Date.now()}; mem.people[norm(p.name)] = p; }
+      if (input.relacion) p.relation = input.relacion;
+      if (input.trato) p.treatment = input.trato;
+      if (input.dato && !p.notes.includes(input.dato)) p.notes.push(input.dato);
+      if (p.notes.length > 30) p.notes = p.notes.slice(-30);
+      saveMem(); return 'Ficha de ' + p.name + ' guardada.';
+    }
+    if (name === 'recordar'){
+      if (input.dato && !mem.facts.includes(input.dato)) mem.facts.push(input.dato);
+      if (mem.facts.length > 60) mem.facts = mem.facts.slice(-60);
+      saveMem(); return 'Guardado.';
+    }
+    if (name === 'olvidar'){
+      const q = norm(input.dato);
+      if (input.persona){
+        const p = findPerson(input.persona); if (!p) return 'No tengo a esa persona.';
+        if (!q){ delete mem.people[norm(p.name)]; if (mem.speaker === norm(p.name)) mem.speaker = null; saveMem(); renderWho(); return 'Olvidé a ' + p.name + '.'; }
+        const before = p.notes.length; p.notes = p.notes.filter(n => !norm(n).includes(q) && !q.includes(norm(n)));
+        saveMem(); return before === p.notes.length ? 'No encontré ese dato.' : 'Dato borrado.';
+      }
+      const before = mem.facts.length; mem.facts = mem.facts.filter(f => !norm(f).includes(q) && !q.includes(norm(f)));
+      saveMem(); return before === mem.facts.length ? 'No encontré ese dato.' : 'Dato borrado.';
+    }
+  } catch (e){ return 'Error: ' + e.message; }
+  return 'Herramienta desconocida.';
+}
+
+function memoryBlock(){
+  const ppl = Object.values(mem.people);
+  let t = `\n\nMEMORIA
+Usuario (tu dueño): ${cfg.owner || 'nombre no configurado'}. A él lo llamás "${cfg.name || 'señor'}".`;
+  t += ppl.length
+    ? '\nPersonas conocidas:\n' + ppl.map(p => `- ${p.name}${p.relation ? ' — ' + p.relation : ''}${p.treatment ? '. Trato: ' + p.treatment : ''}${p.notes.length ? '. Datos: ' + p.notes.join('; ') : ''}`).join('\n')
+    : '\nTodavía no conocés a nadie más.';
+  if (mem.facts.length) t += '\nDatos guardados por el usuario:\n' + mem.facts.map(f => '- ' + f).join('\n');
+  t += `\nAhora te está hablando: ${speakerLabel()}${mem.speaker ? ' (no es el usuario)' : ' (el usuario)'}.
+Reglas de interlocutores:
+- Cada mensaje llega con el prefijo [Habla: Nombre] que indica quién hablaba en ese momento.
+- Si te habla otra persona, dirigite a ella según su ficha y su trato; no la llames "${cfg.name || 'señor'}". Seguís siendo el asistente del usuario.
+- Si alguien se presenta y no lo conocés, saludalo por su nombre, usá establecer_interlocutor y, si no está claro, preguntale con cortesía su relación con el usuario.
+- Cuando el usuario te presente a alguien, guardá su ficha con guardar_persona. No inventes datos que nadie dijo.
+- Lo que el usuario guardó sobre una persona es confidencial: no se lo cuentes a terceros ni a esa persona salvo que el usuario lo autorice. Solo el usuario puede pedirte olvidar o cambiar fichas de otros.
+- Usá las herramientas en silencio: no anuncies que guardás o cambiás algo, salvo una confirmación breve y natural cuando te piden recordar u olvidar.`;
+  return t;
+}
+
+/* ---------- Cerebro ---------- */
 function systemPrompt(){
   const now = new Date().toLocaleString('es-AR', {dateStyle:'full', timeStyle:'short'});
   const name = cfg.name || 'señor';
   return `Sos ${AN()}, el asistente personal de inteligencia artificial de tu usuario, a quien llamás "${name}". Si te preguntan, tu nombre es ${AN()}.
 Personalidad: inspirada en J.A.R.V.I.S., el asistente de Tony Stark. Leal, sereno, extremadamente competente y anticipatorio. Ingenio seco y sutil, de mayordomo británico, que aparece de vez en cuando sin restar utilidad. Nunca servil ni empalagoso. Si una idea es mala o riesgosa, lo decís con elegancia y franqueza.
-Idioma: español, trato de usted, cálido y preciso.
+Idioma: español, cálido y preciso. Con el usuario, trato de usted.
 Tus respuestas se escuchan en voz alta, así que:
 - Por defecto sé breve: una a cuatro oraciones. Extendete solo si te piden detalle o explicación.
 - Nada de markdown, viñetas, emojis, tablas ni enlaces. Si hay pasos, enumerálos en prosa ("primero…, luego…").
 - Escribí números, horas y unidades de forma natural para ser leídos.
 - Empezá directo con la respuesta, sin repetir la pregunta.
 Si no sabés algo o necesitás información actual que no tenés, decilo con honestidad.
-Fecha y hora actual del usuario: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '');
+Fecha y hora actual: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '') + memoryBlock();
+}
+
+function buildMessages(){
+  let h = history.slice(-20);
+  while (h.length && h[0].role !== 'user') h = h.slice(1);
+  return h.map(m => m.role === 'user'
+    ? {role:'user', content: '[Habla: ' + (m.who || ownerLabel()) + '] ' + m.content}
+    : {role:'assistant', content: m.content || '…'});
+}
+
+async function callClaude(messages, onText){
+  const tools = [...TOOLS];
+  if (cfg.web) tools.push({type:'web_search_20250305', name:'web_search', max_uses:3});
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST', signal: abortCtrl.signal,
+    headers:{
+      'content-type':'application/json',
+      'x-api-key': cfg.key,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body: JSON.stringify({model: cfg.model, max_tokens: 1024, system: systemPrompt(), messages, tools, stream: true})
+  });
+  if (!res.ok){
+    let msg = res.status + '';
+    try { msg = (await res.json()).error.message; } catch {}
+    throw new Error(msg);
+  }
+  const reader = res.body.getReader(), dec = new TextDecoder();
+  const blocks = []; let stop = null, sse = '';
+  while (true){
+    const {done, value} = await reader.read();
+    if (done) break;
+    sse += dec.decode(value, {stream:true});
+    const lines = sse.split('\n'); sse = lines.pop();
+    for (const line of lines){
+      if (!line.startsWith('data:')) continue;
+      let ev; try { ev = JSON.parse(line.slice(5)); } catch { continue; }
+      if (ev.type === 'content_block_start'){
+        const b = {...ev.content_block};
+        if (b.type === 'tool_use' || b.type === 'server_tool_use') b._json = '';
+        if (b.type === 'text') b.text = b.text || '';
+        blocks[ev.index] = b;
+      } else if (ev.type === 'content_block_delta'){
+        const b = blocks[ev.index], d = ev.delta || {};
+        if (!b) continue;
+        if (d.type === 'text_delta'){ b.text += d.text; onText(d.text); }
+        else if (d.type === 'input_json_delta') b._json += d.partial_json || '';
+        else if (d.type === 'citations_delta'){ (b.citations = b.citations || []).push(d.citation); }
+      } else if (ev.type === 'content_block_stop'){
+        const b = blocks[ev.index];
+        if (b && b._json !== undefined){ try { b.input = b._json ? JSON.parse(b._json) : {}; } catch { b.input = {}; } delete b._json; }
+      } else if (ev.type === 'message_delta'){
+        stop = ev.delta && ev.delta.stop_reason;
+      } else if (ev.type === 'error'){
+        throw new Error(ev.error && ev.error.message || 'error de transmisión');
+      }
+    }
+  }
+  return {blocks: blocks.filter(b => b && !(b.type === 'text' && !b.text)), stop};
 }
 
 async function ask(text){
   if (!cfg.key){ toast('Primero configure su clave de API en Protocolos.'); openSheet('#cfgSheet'); return; }
   stopAll(); stopped = false;
+  if (mem.speaker && Date.now() - mem.lastAt > 20 * 60e3){ mem.speaker = null; renderWho(); } // tras 20 min, vuelve a ser usted
+  mem.lastAt = Date.now(); saveMem();
   capUser(text); capBot('');
-  history.push({role:'user', content:text});
+  const userMsg = {role:'user', content:text, who: speakerLabel()};
+  history.push(userMsg);
   setState('thinking');
   streamDone = false;
   let full = '', buf = '';
+  const onText = t => { full += t; buf += t; capBot(full); if (!stopped) buf = flushSentences(buf); };
   abortCtrl = new AbortController();
   try {
-    const body = {model: cfg.model, max_tokens: 1024, system: systemPrompt(), messages: history.slice(-20), stream: true};
-    if (cfg.web) body.tools = [{type:'web_search_20250305', name:'web_search', max_uses:3}];
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST', signal: abortCtrl.signal,
-      headers:{
-        'content-type':'application/json',
-        'x-api-key': cfg.key,
-        'anthropic-version':'2023-06-01',
-        'anthropic-dangerous-direct-browser-access':'true'
-      },
-      body: JSON.stringify(body)
-    });
-    if (!res.ok){
-      let msg = res.status + '';
-      try { msg = (await res.json()).error.message; } catch {}
-      throw new Error(msg);
-    }
-    const reader = res.body.getReader(), dec = new TextDecoder();
-    let sse = '';
-    while (true){
-      const {done, value} = await reader.read();
-      if (done) break;
-      sse += dec.decode(value, {stream:true});
-      const lines = sse.split('\n'); sse = lines.pop();
-      for (const line of lines){
-        if (!line.startsWith('data:')) continue;
-        let ev; try { ev = JSON.parse(line.slice(5)); } catch { continue; }
-        if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta'){
-          full += ev.delta.text; buf += ev.delta.text;
-          capBot(full);
-          if (!stopped) buf = flushSentences(buf);
-        } else if (ev.type === 'error'){
-          throw new Error(ev.error && ev.error.message || 'error de transmisión');
-        }
-      }
+    const msgs = buildMessages();
+    for (let round = 0; round < 5; round++){
+      const r = await callClaude(msgs, onText);
+      if (r.stop === 'pause_turn'){ msgs.push({role:'assistant', content: r.blocks}); continue; }
+      if (r.stop !== 'tool_use') break;
+      const uses = r.blocks.filter(b => b.type === 'tool_use');
+      if (!uses.length) break;
+      msgs.push({role:'assistant', content: r.blocks});
+      msgs.push({role:'user', content: uses.map(u => ({type:'tool_result', tool_use_id: u.id, content: runTool(u.name, u.input)}))});
+      if (full && !/\s$/.test(full)){ full += ' '; buf += ' '; }
     }
     if (buf.trim() && !stopped) speak(buf);
-    history.push({role:'assistant', content: full || '…'});
+    userMsg.who = userMsg.who === speakerLabel() ? userMsg.who : speakerLabel(); // si se presentó en este turno
+    history.push({role:'assistant', content: full.trim() || '…'});
   } catch (e){
     if (e.name === 'AbortError'){
       if (full) history.push({role:'assistant', content: full}); else history.pop();
@@ -500,6 +664,32 @@ async function ask(text){
   }
 }
 
+function renderPeople(){
+  const el = $('#pplList'); el.innerHTML = '';
+  const ppl = Object.values(mem.people).sort((a, b) => a.name.localeCompare(b.name));
+  if (!ppl.length) el.innerHTML = '<div class="empty">Todavía no conoce a nadie.</div>';
+  for (const p of ppl){
+    const c = document.createElement('div'); c.className = 'pcard';
+    const h = document.createElement('h3'); h.textContent = p.name;
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = 'Olvidar';
+    del.onclick = () => { if (!confirm('¿Olvidar a ' + p.name + '?')) return; delete mem.people[norm(p.name)]; if (mem.speaker === norm(p.name)) mem.speaker = null; saveMem(); renderWho(); renderPeople(); };
+    h.appendChild(del); c.appendChild(h);
+    if (p.relation){ const x = document.createElement('p'); x.textContent = p.relation; c.appendChild(x); }
+    if (p.treatment){ const x = document.createElement('p'); x.textContent = 'Trato: ' + p.treatment; c.appendChild(x); }
+    if (p.notes.length){ const ul = document.createElement('ul'); for (const n of p.notes){ const li = document.createElement('li'); li.textContent = n; ul.appendChild(li); } c.appendChild(ul); }
+    el.appendChild(c);
+  }
+  const fl = $('#factList'); fl.innerHTML = '';
+  if (!mem.facts.length) fl.innerHTML = '<div class="empty">Sin datos guardados. Dígale "acordate de que…".</div>';
+  mem.facts.forEach((f, i) => {
+    const c = document.createElement('div'); c.className = 'pcard';
+    const h = document.createElement('h3'); const sp = document.createElement('span'); sp.style.cssText = 'font-weight:500;font-size:16px'; sp.textContent = f; h.appendChild(sp);
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = 'Borrar';
+    del.onclick = () => { mem.facts.splice(i, 1); saveMem(); renderPeople(); };
+    h.appendChild(del); c.appendChild(h); fl.appendChild(c);
+  });
+}
+
 /* ---------- Controles ---------- */
 function micAction(){
   if (listening){ if (NATIVE){ if (finishListen) finishListen(); } else if (rec) rec.stop(); return; }
@@ -514,19 +704,22 @@ $('#form').onsubmit = e => { e.preventDefault(); const t = $('#txt').value.trim(
 function openSheet(id){
   if (id === '#cfgSheet') fillCfg();
   if (id === '#logSheet') renderLog();
+  if (id === '#pplSheet') renderPeople();
   $(id).classList.add('open');
 }
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('.sheet').classList.remove('open'));
 $('#btnCfg').onclick = () => openSheet('#cfgSheet');
 $('#btnLog').onclick = () => openSheet('#logSheet');
+$('#btnPpl').onclick = () => openSheet('#pplSheet');
+$('#who').onclick = () => { mem.speaker = null; saveMem(); renderWho(); toast('Ahora le hablo a usted, ' + (cfg.name || 'señor') + '.', 2000); };
 
 function fillCfg(){
-  $('#cKey').value = cfg.key; $('#cAName').value = cfg.aname; $('#cWake').checked = cfg.wake; $('#cSens').value = cfg.sens; refreshWakeUi(); $('#cModel').value = cfg.model; $('#cName').value = cfg.name; $('#cCtx').value = cfg.ctx;
+  $('#cKey').value = cfg.key; $('#cAName').value = cfg.aname; $('#cOwner').value = cfg.owner; $('#cWake').checked = cfg.wake; $('#cSens').value = cfg.sens; refreshWakeUi(); $('#cModel').value = cfg.model; $('#cName').value = cfg.name; $('#cCtx').value = cfg.ctx;
   $('#cVoice').value = cfg.voice; $('#cRate').value = cfg.rate; $('#cPitch').value = cfg.pitch;
   $('#cConv').checked = cfg.converse; $('#cWeb').checked = cfg.web; updRanges();
 }
 function readCfg(){
-  cfg = {...cfg, aname: $('#cAName').value.trim() || 'Claudio', wake: $('#cWake').checked, sens: +$('#cSens').value, key: $('#cKey').value.trim(), model: $('#cModel').value, name: $('#cName').value.trim() || 'señor',
+  cfg = {...cfg, aname: $('#cAName').value.trim() || 'Claudio', owner: $('#cOwner').value.trim(), wake: $('#cWake').checked, sens: +$('#cSens').value, key: $('#cKey').value.trim(), model: $('#cModel').value, name: $('#cName').value.trim() || 'señor',
     ctx: $('#cCtx').value.trim(), voice: $('#cVoice').value, rate: +$('#cRate').value, pitch: +$('#cPitch').value,
     converse: $('#cConv').checked, web: $('#cWeb').checked};
 }
@@ -592,6 +785,7 @@ if (WK){
 }
 
 applyName();
+renderWho();
 if (NATIVE){
   // En la app no hace falta tocar para iniciar: Android no exige un gesto para hablar.
   setTimeout(() => bootDone(false), 2200);
