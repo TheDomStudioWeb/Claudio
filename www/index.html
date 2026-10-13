@@ -348,7 +348,7 @@ function checkDone(){
   if (document.body.dataset.state !== 'error') setState('idle');
   if (cfg.converse && !stopped){
     clearTimeout(setState._r); // la conversación sigue: no reactivar la escucha del nombre
-    setTimeout(() => { if (!stopped && document.body.dataset.state === 'idle') listen(); }, 650);
+    setTimeout(() => { if (!stopped && document.body.dataset.state === 'idle') listen(); }, 800);
   }
 }
 function stopAll(){
@@ -381,35 +381,36 @@ async function listenNative(opts = {}){
     if (p.speechRecognition !== 'granted') p = await NSR.requestPermissions();
     if (p.speechRecognition !== 'granted'){ listening = false; toast('Necesito permiso para usar el micrófono.'); return; }
   } catch {}
-  if (WK){ try { await WK.pause(); } catch {} }
-  if (opts.beep !== false && WK){ try { await WK.beep(); } catch {} await new Promise(r => setTimeout(r, 180)); }
-  setState('listening'); capUser('Lo escucho…');
+  try { await WK.pause(); } catch {}
+  setState('listening'); capUser('Preparando…');
 
-  let last = '', heard = false, done = false, guard = null, h1 = null, h2 = null;
+  let last = '', done = false, guard = null, h = null;
   const arm = ms => { clearTimeout(guard); guard = setTimeout(() => finish(), ms); };
   const finish = () => {
     if (done) return; done = true; finishListen = null;
     clearTimeout(guard);
-    if (h1) h1.remove(); if (h2) h2.remove();
-    NSR.stop().catch(() => {});
+    if (h) h.remove();
+    WK.cancelListen().catch(() => {});
     listening = false;
     const t = last.trim();
     if (t) ask(t); else { capUser(''); setState('idle'); }
   };
-  finishListen = finish;
+  finishListen = () => { WK.stopListen().catch(() => {}); arm(1200); }; // tocar el mic: cerrar y procesar lo dicho
   try {
-    h1 = await NSR.addListener('partialResults', d => {
-      const m = d && d.matches && d.matches[0];
-      if (m){ last = m; heard = true; capUser(m); arm(2500); }
+    h = await WK.addListener('stt', ev => {
+      if (done || !ev) return;
+      if (ev.type === 'ready'){ capUser('Lo escucho…'); arm(9000); }
+      else if (ev.type === 'begin') arm(12000);
+      else if (ev.type === 'partial'){ last = ev.text || last; capUser(last); arm(4000); }
+      else if (ev.type === 'end') arm(2500);
+      else if (ev.type === 'final'){ if (ev.text) last = ev.text; finish(); }
+      else if (ev.type === 'silence') finish();
+      else if (ev.type === 'error'){ if (!last) toast('Micrófono: ' + (ev.text || 'error')); finish(); }
     });
-    h2 = await NSR.addListener('listeningState', d => {
-      if (d && d.status === 'stopped') arm(heard ? 900 : 1500);
-    });
-    arm(8000); // si no habla en 8 segundos, deja de escuchar
-    await NSR.start({language: 'es-AR', maxResults: 1, partialResults: true, popup: false});
+    arm(6000); // si el reconocedor ni siquiera arranca
+    await WK.listen({language: 'es-AR', beep: opts.beep !== false});
   } catch (e){
-    const m = String((e && e.message) || e);
-    if (!/match|speech input|timeout|busy/i.test(m)) toast('Micrófono: ' + m);
+    toast('Micrófono: ' + ((e && e.message) || e));
     finish();
   }
 }
