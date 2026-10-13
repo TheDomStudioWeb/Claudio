@@ -1,0 +1,20 @@
+{
+  "name": "jarvis",
+  "version": "1.0.0",
+  "private": true,
+  "description": "J.A.R.V.I.S. — asistente personal de voz con IA",
+  "scripts": {
+    "sync": "cap sync android",
+    "assets": "capacitor-assets generate --android --iconBackgroundColor '#02070d' --iconBackgroundColorDark '#02070d' --splashBackgroundColor '#02070d' --splashBackgroundColorDark '#02070d'"
+  },
+  "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.1",
+    "@capacitor-community/text-to-speech": "^8.0.2",
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/core": "^8.5.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.3"
+  }
+}

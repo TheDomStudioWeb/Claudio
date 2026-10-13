@@ -1,0 +1,15 @@
+{
+  "appId": "com.thedomstudio.jarvis",
+  "appName": "JARVIS",
+  "webDir": "www",
+  "backgroundColor": "#02070d",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "DARK",
+      "insetsHandling": "css"
+    }
+  }
+}

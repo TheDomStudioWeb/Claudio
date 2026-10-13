@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#02070d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>J.A.R.V.I.S.</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Rajdhani:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#02070d; --bg2:#06131f; --c:#3ee6ff; --c2:#0fa3c9; --dim:#1b4a5c;
+  --txt:#cfefff; --muted:#6c9db0; --warn:#ffb547; --err:#ff4d5e;
+  --glow:0 0 12px rgba(62,230,255,.55);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:Rajdhani,system-ui,sans-serif;overflow:hidden}
+body{background:radial-gradient(circle at 50% 38%,#0a2234 0%,var(--bg2) 35%,var(--bg) 75%);display:flex;flex-direction:column;
+  padding:max(env(safe-area-inset-top),var(--safe-area-inset-top,0px)) 0 max(env(safe-area-inset-bottom),var(--safe-area-inset-bottom,0px))}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(62,230,255,.035) 0 1px,transparent 1px 3px);mix-blend-mode:screen}
+body[data-state=listening]{--c:#7df9ff}
+body[data-state=thinking]{--c:#ffd36e;--c2:#c99a2e}
+body[data-state=error]{--c:var(--err);--c2:#a3283a}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 4px}
+.brand{font-family:Orbitron;font-weight:700;letter-spacing:.32em;font-size:15px;color:var(--c);text-shadow:var(--glow)}
+.status{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:6px}
+.status i{width:7px;height:7px;border-radius:50%;background:var(--c);box-shadow:var(--glow);animation:blink 1.6s infinite}
+.icon-btn{background:none;border:1px solid var(--dim);color:var(--c);width:38px;height:38px;border-radius:10px;display:grid;place-items:center;cursor:pointer}
+.icon-btn svg{width:18px;height:18px}
+.hdr-r{display:flex;gap:8px}
+
+main{flex:1;display:flex;flex-direction:column;align-items:center;min-height:0;padding:0 16px}
+.hud-wrap{position:relative;width:min(78vw,340px);aspect-ratio:1;margin:6px auto 0;flex-shrink:0;cursor:pointer}
+.hud{width:100%;height:100%;overflow:visible}
+.hud *{transform-origin:150px 150px;transition:stroke .4s,fill .4s}
+.hud .s{fill:none;stroke:var(--c)}
+.r1{animation:spin 60s linear infinite}
+.r2{animation:spin 26s linear infinite reverse}
+.r3{animation:spin 90s linear infinite}
+.r4{animation:spin 14s linear infinite}
+.r5{animation:spin 9s linear infinite reverse}
+.core{fill:url(#coreG);filter:drop-shadow(0 0 18px var(--c));animation:breathe 4s ease-in-out infinite}
+body[data-state=thinking] .r2{animation-duration:3s}
+body[data-state=thinking] .r4{animation-duration:1.6s}
+body[data-state=thinking] .r5{animation-duration:1.1s}
+body[data-state=listening] .core{animation:breathe .9s ease-in-out infinite}
+body[data-state=speaking] .core{animation:talk .32s ease-in-out infinite alternate}
+body[data-state=speaking] .r4{animation-duration:5s}
+.core-label{font-family:Orbitron;font-size:9px;letter-spacing:.3em;fill:#02121c;font-weight:700}
+
+.caption{width:100%;max-width:620px;flex:1;min-height:0;overflow-y:auto;padding:14px 4px 8px;text-align:center;
+  mask-image:linear-gradient(transparent,#000 14px,#000 calc(100% - 14px),transparent)}
+.cap-user{color:var(--muted);font-size:15px;margin-bottom:8px;min-height:1em}
+.cap-bot{font-size:20px;line-height:1.35;font-weight:500;color:var(--txt);white-space:pre-wrap}
+.cap-hint{color:var(--muted);font-size:15px;letter-spacing:.06em}
+
+footer{display:flex;gap:10px;align-items:center;padding:10px 16px 14px;max-width:660px;width:100%;margin:0 auto}
+.input{flex:1;display:flex;align-items:center;border:1px solid var(--dim);border-radius:14px;background:rgba(6,25,38,.7);padding:0 6px 0 14px;height:52px}
+.input input{flex:1;background:none;border:0;outline:0;color:var(--txt);font:500 17px Rajdhani;min-width:0}
+.input input::placeholder{color:var(--muted)}
+.send{background:none;border:0;color:var(--c);width:40px;height:40px;display:grid;place-items:center;cursor:pointer}
+.mic{width:64px;height:64px;border-radius:50%;border:2px solid var(--c);background:radial-gradient(circle,rgba(62,230,255,.25),rgba(2,7,13,.9));
+  color:var(--c);display:grid;place-items:center;cursor:pointer;box-shadow:var(--glow);flex-shrink:0;position:relative}
+.mic svg{width:26px;height:26px}
+body[data-state=listening] .mic::after{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px solid var(--c);animation:ping 1.2s infinite}
+body[data-state=speaking] .mic,body[data-state=thinking] .mic{border-color:var(--warn);color:var(--warn)}
+
+/* Paneles */
+.sheet{position:fixed;inset:0;background:rgba(1,5,9,.82);backdrop-filter:blur(6px);display:none;z-index:20;overflow-y:auto}
+.sheet.open{display:block}
+.panel{max-width:560px;margin:0 auto;padding:calc(max(env(safe-area-inset-top),var(--safe-area-inset-top,0px)) + 18px) 16px 40px}
+.panel h2{font-family:Orbitron;font-size:15px;letter-spacing:.25em;color:var(--c);margin:0 0 18px;display:flex;justify-content:space-between;align-items:center}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.field input[type=text],.field input[type=password],.field select,.field textarea{width:100%;background:#061926;border:1px solid var(--dim);border-radius:10px;color:var(--txt);
+  font:500 16px Rajdhani;padding:11px 12px;outline:0}
+.field textarea{min-height:80px;resize:vertical}
+.field small{display:block;color:var(--muted);font-size:13px;margin-top:5px;line-height:1.35}
+.field small a{color:var(--c)}
+.row{display:flex;gap:14px}.row>*{flex:1}
+.toggle{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid #0d2a38}
+.toggle span{font-size:16px}.toggle small{display:block;color:var(--muted);font-size:13px}
+input[type=range]{width:100%;accent-color:var(--c)}
+input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
+.btns{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.btn{flex:1;min-width:130px;height:46px;border-radius:12px;border:1px solid var(--c);background:rgba(62,230,255,.12);color:var(--c);font:600 15px Rajdhani;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+.btn.ghost{border-color:var(--dim);color:var(--muted);background:none}
+.log{display:flex;flex-direction:column;gap:10px}
+.bub{padding:10px 13px;border-radius:12px;font-size:16px;line-height:1.35;max-width:88%;white-space:pre-wrap}
+.bub.user{align-self:flex-end;background:#0b2a3c;color:var(--txt)}
+.bub.bot{align-self:flex-start;border:1px solid var(--dim);background:rgba(6,25,38,.6)}
+.empty{color:var(--muted);text-align:center;padding:30px 0}
+
+/* Arranque */
+.boot{position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;cursor:pointer;padding:24px}
+.boot.hide{opacity:0;pointer-events:none;transition:opacity .6s}
+.boot pre{font:500 13px/1.6 Rajdhani;color:var(--muted);letter-spacing:.08em;margin:0;min-height:8em;width:min(320px,100%)}
+.boot b{font-family:Orbitron;color:var(--c);letter-spacing:.3em;text-shadow:var(--glow);font-size:13px;animation:blink 1.6s infinite}
+.toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#071c2a;border:1px solid var(--warn);color:var(--warn);
+  padding:10px 16px;border-radius:10px;font-size:15px;z-index:40;max-width:90vw;text-align:center;display:none}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.06);opacity:1}}
+@keyframes talk{from{transform:scale(.96)}to{transform:scale(1.1)}}
+@keyframes ping{from{transform:scale(1);opacity:.8}to{transform:scale(1.35);opacity:0}}
+@keyframes blink{50%{opacity:.35}}
+</style>
+</head>
+<body data-state="idle">
+
+<div class="boot" id="boot">
+  <svg width="90" height="90" viewBox="0 0 300 300"><circle cx="150" cy="150" r="120" fill="none" stroke="#3ee6ff" stroke-width="4" stroke-dasharray="40 14" opacity=".8"/><circle cx="150" cy="150" r="60" fill="#3ee6ff" opacity=".85"/></svg>
+  <pre id="bootLog"></pre>
+  <b>TOCAR PARA INICIAR</b>
+</div>
+
+<header>
+  <div>
+    <div class="brand">J.A.R.V.I.S.</div>
+    <div class="status"><i></i><span id="status">En línea</span></div>
+  </div>
+  <div class="hdr-r">
+    <button class="icon-btn" id="btnLog" aria-label="Historial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+    <button class="icon-btn" id="btnCfg" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+  </div>
+</header>
+
+<main>
+  <div class="hud-wrap" id="hud" title="Tocar para hablar">
+    <svg class="hud" viewBox="0 0 300 300">
+      <defs>
+        <radialGradient id="coreG"><stop offset="0" stop-color="#ffffff"/><stop offset=".35" stop-color="var(--c)"/><stop offset="1" stop-color="var(--c2)" stop-opacity=".15"/></radialGradient>
+      </defs>
+      <g class="r1"><circle class="s" cx="150" cy="150" r="142" stroke-width="1" stroke-dasharray="2 7" opacity=".7"/></g>
+      <g class="r2"><circle class="s" cx="150" cy="150" r="128" stroke-width="3" stroke-dasharray="70 18 12 18 140 30" opacity=".85"/></g>
+      <g class="r3"><circle class="s" cx="150" cy="150" r="110" stroke-width="9" stroke-dasharray="1.5 4.5" opacity=".45"/></g>
+      <circle class="s" cx="150" cy="150" r="96" stroke-width=".8" opacity=".5"/>
+      <g class="r4"><circle class="s" cx="150" cy="150" r="84" stroke-width="5" stroke-dasharray="110 20 40 20 60 20" opacity=".9"/></g>
+      <g class="r5"><circle class="s" cx="150" cy="150" r="70" stroke-width="1.5" stroke-dasharray="30 10" opacity=".7"/></g>
+      <circle class="core" cx="150" cy="150" r="52"/>
+      <text class="core-label" x="150" y="153" text-anchor="middle">JARVIS</text>
+    </svg>
+  </div>
+
+  <div class="caption" id="caption">
+    <div class="cap-user" id="capUser"></div>
+    <div class="cap-bot" id="capBot"><span class="cap-hint">Toque el núcleo o el micrófono para hablar.</span></div>
+  </div>
+</main>
+
+<footer>
+  <form class="input" id="form" autocomplete="off">
+    <input id="txt" placeholder="Escribir a JARVIS…" enterkeyhint="send">
+    <button class="send" aria-label="Enviar"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+  </form>
+  <button class="mic" id="mic" aria-label="Hablar">
+    <svg id="micIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+  </button>
+</footer>
+
+<!-- Ajustes -->
+<div class="sheet" id="cfgSheet"><div class="panel">
+  <h2>PROTOCOLOS <button class="icon-btn" data-close aria-label="Cerrar">✕</button></h2>
+  <div class="field">
+    <label>Clave de API de Anthropic</label>
+    <input type="password" id="cKey" placeholder="sk-ant-…">
+    <small>Se guarda solo en este dispositivo. Obtenela en <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</small>
+  </div>
+  <div class="field">
+    <label>Núcleo de IA</label>
+    <select id="cModel">
+      <option value="claude-haiku-5-5">Haiku 5.5 — respuesta más rápida</option>
+      <option value="claude-sonnet-5-5">Sonnet 5.5 — equilibrado</option>
+      <option value="claude-opus-5-5">Opus 5.5 — máximo razonamiento</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>¿Cómo debo llamarlo?</label>
+    <input type="text" id="cName" placeholder="señor">
+  </div>
+  <div class="field">
+    <label>Contexto personal</label>
+    <textarea id="cCtx" placeholder="Ej: Vivo en Mendoza, Argentina. Dirijo un estudio de desarrollo web. Prefiero respuestas directas."></textarea>
+    <small>JARVIS lo tendrá presente en todas las respuestas.</small>
+  </div>
+  <div class="field">
+    <label>Voz</label>
+    <select id="cVoice"></select>
+  </div>
+  <div class="row">
+    <div class="field"><label>Velocidad <span id="vRate"></span></label><input type="range" id="cRate" min=".7" max="1.5" step=".05"></div>
+    <div class="field"><label>Tono <span id="vPitch"></span></label><input type="range" id="cPitch" min=".5" max="1.5" step=".05"></div>
+  </div>
+  <label class="toggle"><div><span>Conversación continua</span><small>Vuelve a escuchar al terminar de hablar</small></div><input type="checkbox" id="cConv"></label>
+  <label class="toggle"><div><span>Búsqueda web</span><small>Para noticias, clima, precios y datos actuales</small></div><input type="checkbox" id="cWeb"></label>
+  <div class="btns">
+    <button class="btn ghost" id="testVoice">Probar voz</button>
+    <button class="btn ghost" id="clearHist">Borrar memoria</button>
+    <button class="btn" id="saveCfg">Guardar</button>
+  </div>
+</div></div>
+
+<!-- Historial -->
+<div class="sheet" id="logSheet"><div class="panel">
+  <h2>REGISTRO <button class="icon-btn" data-close aria-label="Cerrar">✕</button></h2>
+  <div class="log" id="log"></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script src="capacitor.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+// En la APK (Capacitor) se usan el reconocimiento y la voz nativos de Android; en el navegador, la Web Speech API.
+const CAP = window.Capacitor;
+const NATIVE = !!(CAP && CAP.isNativePlatform && CAP.isNativePlatform());
+const NSR = NATIVE ? CAP.registerPlugin('SpeechRecognition') : null;
+const NTTS = NATIVE ? CAP.registerPlugin('TextToSpeech') : null;
+let gen = 0; // se incrementa en cada interrupción para ignorar callbacks viejos
+const DEF = {key:'', model:'claude-sonnet-5-5', name:'señor', ctx:'', voice:'', rate:1.05, pitch:.9, converse:true, web:false};
+let cfg = DEF;
+try { cfg = {...DEF, ...JSON.parse(localStorage.getItem('jarvis.cfg') || '{}')}; } catch {}
+let history = [];
+try { history = JSON.parse(localStorage.getItem('jarvis.hist') || '[]'); } catch {}
+
+const saveCfg = () => { try { localStorage.setItem('jarvis.cfg', JSON.stringify(cfg)); } catch {} };
+const saveHist = () => { try { localStorage.setItem('jarvis.hist', JSON.stringify(history.slice(-40))); } catch {} };
+
+/* ---------- Estado e interfaz ---------- */
+const LABEL = {idle:'En línea', listening:'Escuchando', thinking:'Procesando', speaking:'Respondiendo', error:'Falla'};
+function setState(s){ document.body.dataset.state = s; $('#status').textContent = LABEL[s] || s; }
+function toast(m, ms = 3500){ const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', ms); }
+function capUser(t){ $('#capUser').textContent = t ? '« ' + t + ' »' : ''; }
+function capBot(t){ $('#capBot').textContent = t; const c = $('#caption'); c.scrollTop = c.scrollHeight; }
+
+function renderLog(){
+  const el = $('#log'); el.innerHTML = '';
+  if (!history.length){ el.innerHTML = '<div class="empty">Sin registros todavía.</div>'; return; }
+  for (const m of history){ const d = document.createElement('div'); d.className = 'bub ' + (m.role === 'user' ? 'user' : 'bot'); d.textContent = m.content; el.appendChild(d); }
+  el.parentElement.parentElement.scrollTop = 1e6;
+}
+
+/* ---------- Voz: salida ---------- */
+const synth = window.speechSynthesis;
+let voices = [], pending = 0, streamDone = true, stopped = false, abortCtrl = null;
+
+function fillVoices(){
+  const sel = $('#cVoice'); sel.innerHTML = '<option value="">Automática</option>';
+  for (const v of voices){ const o = document.createElement('option'); o.value = v.id; o.textContent = v.name + ' (' + v.lang + ')'; sel.appendChild(o); }
+  sel.value = cfg.voice;
+}
+async function loadVoices(){
+  if (NATIVE){
+    try {
+      const {voices: all} = await NTTS.getSupportedVoices();
+      voices = all.map((v, i) => ({...v, id: 'n' + i, idx: i})).filter(v => (v.lang || '').toLowerCase().startsWith('es'));
+    } catch { voices = []; }
+  } else if (synth){
+    voices = synth.getVoices().filter(v => v.lang.toLowerCase().startsWith('es')).map(v => ({id: v.voiceURI, name: v.name, lang: v.lang, raw: v}));
+  }
+  fillVoices();
+}
+loadVoices();
+if (!NATIVE && synth) synth.onvoiceschanged = loadVoices;
+
+function pickVoice(){
+  return voices.find(v => v.id === cfg.voice)
+      || voices.find(v => /es[-_](AR|419|US|MX)/i.test(v.lang))
+      || null;
+}
+function clean(t){
+  return t.replace(/https?:\/\/\S+/g, '').replace(/[*_#`>|~]/g, '').replace(/\s+/g, ' ').trim();
+}
+function speak(text){
+  text = clean(text);
+  if (!text || (!NATIVE && !synth)) return;
+  const g = gen, v = pickVoice();
+  const done = () => { if (g !== gen) return; pending--; checkDone(); };
+  pending++; setState('speaking');
+  if (NATIVE){
+    const o = {text, lang: v ? v.lang : 'es-AR', rate: cfg.rate, pitch: cfg.pitch, volume: 1, queueStrategy: 1};
+    if (v) o.voice = v.idx;
+    NTTS.speak(o).catch(() => {}).finally(done);
+    return;
+  }
+  const u = new SpeechSynthesisUtterance(text);
+  if (v){ u.voice = v.raw; u.lang = v.lang; } else u.lang = 'es-AR';
+  u.rate = cfg.rate; u.pitch = cfg.pitch;
+  u.onend = u.onerror = done;
+  synth.speak(u);
+}
+function checkDone(){
+  if (pending > 0 || !streamDone) return;
+  pending = 0;
+  if (document.body.dataset.state !== 'error') setState('idle');
+  if (cfg.converse && !stopped) setTimeout(() => { if (!stopped && document.body.dataset.state === 'idle') listen(); }, 400);
+}
+function stopAll(){
+  stopped = true; gen++;
+  if (abortCtrl) abortCtrl.abort();
+  if (NATIVE) NTTS.stop().catch(() => {});
+  else if (synth) synth.cancel();
+  pending = 0;
+}
+// Corta el texto en oraciones completas para empezar a hablar mientras llega la respuesta.
+function flushSentences(buf){
+  const re = /[.!?…;:\n](?=\s)/g; let last = -1, m;
+  while ((m = re.exec(buf))) last = m.index;
+  if (last >= 0){ speak(buf.slice(0, last + 1)); return buf.slice(last + 1); }
+  return buf;
+}
+
+/* ---------- Voz: entrada ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false;
+
+async function listenNative(){
+  if (listening) return;
+  stopAll(); stopped = false;
+  try {
+    let p = await NSR.checkPermissions();
+    if (p.speechRecognition !== 'granted') p = await NSR.requestPermissions();
+    if (p.speechRecognition !== 'granted'){ toast('Necesito permiso para usar el micrófono.'); return; }
+  } catch {}
+  listening = true; setState('listening'); capUser('…');
+  try {
+    const r = await NSR.start({language: 'es-AR', maxResults: 1, partialResults: false, popup: false});
+    listening = false;
+    const t = ((r && r.matches && r.matches[0]) || '').trim();
+    if (t) ask(t); else { capUser(''); setState('idle'); }
+  } catch (e){
+    listening = false; capUser(''); setState('idle');
+    const m = String((e && e.message) || e);
+    if (!/match|speech input|timeout|busy/i.test(m)) toast('Micrófono: ' + m);
+  }
+}
+
+function listen(){
+  if (NATIVE) return listenNative();
+  if (!SR){ toast('Este navegador no tiene reconocimiento de voz. Use Chrome o Edge, o escriba abajo.'); return; }
+  if (listening) return;
+  stopAll(); stopped = false;
+  rec = new SR(); rec.lang = 'es-AR'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+  let finalTxt = '';
+  rec.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++){
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalTxt += t; else interim += t;
+    }
+    capUser(finalTxt + interim);
+  };
+  rec.onerror = e => {
+    if (e.error === 'not-allowed') toast('Necesito permiso para usar el micrófono.');
+    else if (e.error !== 'no-speech' && e.error !== 'aborted') toast('Micrófono: ' + e.error);
+  };
+  rec.onend = () => {
+    listening = false;
+    const t = finalTxt.trim();
+    if (t) ask(t); else setState('idle');
+  };
+  try { rec.start(); listening = true; setState('listening'); capUser(''); } catch { listening = false; }
+}
+
+/* ---------- Cerebro ---------- */
+function systemPrompt(){
+  const now = new Date().toLocaleString('es-AR', {dateStyle:'full', timeStyle:'short'});
+  const name = cfg.name || 'señor';
+  return `Sos J.A.R.V.I.S. (Just A Rather Very Intelligent System), el asistente personal de inteligencia artificial de tu usuario, a quien llamás "${name}".
+Personalidad: inspirado en el JARVIS de Tony Stark. Leal, sereno, extremadamente competente y anticipatorio. Ingenio seco y sutil, de mayordomo británico, que aparece de vez en cuando sin restar utilidad. Nunca servil ni empalagoso. Si una idea es mala o riesgosa, lo decís con elegancia y franqueza.
+Idioma: español, trato de usted, cálido y preciso.
+Tus respuestas se escuchan en voz alta, así que:
+- Por defecto sé breve: una a cuatro oraciones. Extendete solo si te piden detalle o explicación.
+- Nada de markdown, viñetas, emojis, tablas ni enlaces. Si hay pasos, enumerálos en prosa ("primero…, luego…").
+- Escribí números, horas y unidades de forma natural para ser leídos.
+- Empezá directo con la respuesta, sin repetir la pregunta.
+Si no sabés algo o necesitás información actual que no tenés, decilo con honestidad.
+Fecha y hora actual del usuario: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '');
+}
+
+async function ask(text){
+  if (!cfg.key){ toast('Primero configure su clave de API en Protocolos.'); openSheet('#cfgSheet'); return; }
+  stopAll(); stopped = false;
+  capUser(text); capBot('');
+  history.push({role:'user', content:text});
+  setState('thinking');
+  streamDone = false;
+  let full = '', buf = '';
+  abortCtrl = new AbortController();
+  try {
+    const body = {model: cfg.model, max_tokens: 1024, system: systemPrompt(), messages: history.slice(-20), stream: true};
+    if (cfg.web) body.tools = [{type:'web_search_20250305', name:'web_search', max_uses:3}];
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST', signal: abortCtrl.signal,
+      headers:{
+        'content-type':'application/json',
+        'x-api-key': cfg.key,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok){
+      let msg = res.status + '';
+      try { msg = (await res.json()).error.message; } catch {}
+      throw new Error(msg);
+    }
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let sse = '';
+    while (true){
+      const {done, value} = await reader.read();
+      if (done) break;
+      sse += dec.decode(value, {stream:true});
+      const lines = sse.split('\n'); sse = lines.pop();
+      for (const line of lines){
+        if (!line.startsWith('data:')) continue;
+        let ev; try { ev = JSON.parse(line.slice(5)); } catch { continue; }
+        if (ev.type === 'content_block_delta' && ev.delta && ev.delta.type === 'text_delta'){
+          full += ev.delta.text; buf += ev.delta.text;
+          capBot(full);
+          if (!stopped) buf = flushSentences(buf);
+        } else if (ev.type === 'error'){
+          throw new Error(ev.error && ev.error.message || 'error de transmisión');
+        }
+      }
+    }
+    if (buf.trim() && !stopped) speak(buf);
+    history.push({role:'assistant', content: full || '…'});
+  } catch (e){
+    if (e.name === 'AbortError'){
+      if (full) history.push({role:'assistant', content: full}); else history.pop();
+    } else {
+      history.pop();
+      setState('error');
+      const m = 'Disculpe, ' + (cfg.name || 'señor') + '. Hubo una falla: ' + e.message;
+      capBot(m);
+      speak('Disculpe, tuve un problema de conexión con mis sistemas.');
+      stopped = true;
+      setTimeout(() => { if (document.body.dataset.state === 'error') setState('idle'); }, 4000);
+    }
+  } finally {
+    saveHist();
+    streamDone = true;
+    checkDone();
+  }
+}
+
+/* ---------- Controles ---------- */
+function micAction(){
+  if (listening){ if (NATIVE) NSR.stop().catch(() => {}); else if (rec) rec.stop(); return; }
+  const s = document.body.dataset.state;
+  if (s === 'speaking' || s === 'thinking'){ stopAll(); setState('idle'); return; }
+  listen();
+}
+$('#mic').onclick = micAction;
+$('#hud').onclick = micAction;
+$('#form').onsubmit = e => { e.preventDefault(); const t = $('#txt').value.trim(); if (!t) return; $('#txt').value = ''; $('#txt').blur(); ask(t); };
+
+function openSheet(id){
+  if (id === '#cfgSheet') fillCfg();
+  if (id === '#logSheet') renderLog();
+  $(id).classList.add('open');
+}
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('.sheet').classList.remove('open'));
+$('#btnCfg').onclick = () => openSheet('#cfgSheet');
+$('#btnLog').onclick = () => openSheet('#logSheet');
+
+function fillCfg(){
+  $('#cKey').value = cfg.key; $('#cModel').value = cfg.model; $('#cName').value = cfg.name; $('#cCtx').value = cfg.ctx;
+  $('#cVoice').value = cfg.voice; $('#cRate').value = cfg.rate; $('#cPitch').value = cfg.pitch;
+  $('#cConv').checked = cfg.converse; $('#cWeb').checked = cfg.web; updRanges();
+}
+function readCfg(){
+  cfg = {...cfg, key: $('#cKey').value.trim(), model: $('#cModel').value, name: $('#cName').value.trim() || 'señor',
+    ctx: $('#cCtx').value.trim(), voice: $('#cVoice').value, rate: +$('#cRate').value, pitch: +$('#cPitch').value,
+    converse: $('#cConv').checked, web: $('#cWeb').checked};
+}
+function updRanges(){ $('#vRate').textContent = (+$('#cRate').value).toFixed(2); $('#vPitch').textContent = (+$('#cPitch').value).toFixed(2); }
+$('#cRate').oninput = $('#cPitch').oninput = updRanges;
+$('#testVoice').onclick = () => { readCfg(); stopAll(); speak('A su servicio, ' + cfg.name + '. Todos los sistemas operativos.'); };
+$('#clearHist').onclick = () => { history = []; saveHist(); toast('Memoria de conversación borrada.'); };
+$('#saveCfg').onclick = () => { readCfg(); saveCfg(); $('#cfgSheet').classList.remove('open'); toast('Protocolos actualizados.', 2000); };
+
+/* ---------- Arranque ---------- */
+const BOOT = ['> Inicializando núcleo de IA…', '> Calibrando sintetizador de voz…', '> Enlazando reconocimiento de voz…', '> Cargando protocolos personales…', '> Todos los sistemas en línea.'];
+(async () => { const el = $('#bootLog'); for (const l of BOOT){ el.textContent += l + '\n'; await new Promise(r => setTimeout(r, 380)); } })();
+
+function greeting(){
+  const h = new Date().getHours();
+  const g = h < 6 ? 'Buenas noches' : h < 13 ? 'Buenos días' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
+  return `${g}, ${cfg.name || 'señor'}. JARVIS en línea. ¿En qué puedo asistirle?`;
+}
+$('#boot').onclick = () => {
+  $('#boot').classList.add('hide');
+  stopped = true; // el saludo no abre el micrófono solo
+  const g = greeting(); capBot(g); speak(g);
+  if (!cfg.key) setTimeout(() => openSheet('#cfgSheet'), 2600);
+  if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(() => {});
+};
+
+if (!NATIVE && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
