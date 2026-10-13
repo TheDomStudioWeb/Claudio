@@ -28,18 +28,6 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Firma estable (para poder actualizar la app sin desinstalar)
-        env:
-          KS: ${{ secrets.DEBUG_KEYSTORE_B64 }}
-        run: |
-          if [ -n "$KS" ]; then
-            mkdir -p ~/.android
-            echo "$KS" | base64 -d > ~/.android/debug.keystore
-            echo "Usando keystore fija"
-          else
-            echo "::warning::Sin DEBUG_KEYSTORE_B64: cada compilación tendrá otra firma"
-          fi
-
       - name: Dependencias y sincronización
         run: |
           npm ci
