@@ -17,13 +17,14 @@ permití "instalar apps de origen desconocido" e instalala.
 Ahí también elegís voz, velocidad, tono, modelo y tu contexto personal.
 
 ## Activación por voz ("Claudio")
-Solo en la app Android. Escucha la palabra sin conexión con Picovoice Porcupine (gratis para uso personal).
-1. Creá una cuenta en [console.picovoice.ai](https://console.picovoice.ai/) y copiá tu **AccessKey**.
-2. En Porcupine: idioma **Español**, escribí **Claudio**, entrená, elegí plataforma **Android** y descargá el `.ppn`.
-3. En la app: ⚙ Protocolos → Activación por voz → pegá la AccessKey, cargá el `.ppn`, activá y guardá.
-4. Tocá **"Permitir abrir sobre otras apps"** para que se abra sola desde cualquier pantalla.
+Solo en la app Android. Escucha el nombre del asistente sin conexión con [Vosk](https://alphacephei.com/vosk/)
+(open source, modelo pequeño en español). No requiere cuentas ni claves.
+1. ⚙ Protocolos → Activación por voz → activar → Guardar (pide permiso de micrófono y notificaciones).
+2. Tocá **"Permitir abrir sobre otras apps"** para que se abra sola desde cualquier pantalla.
+3. Ajustá la **sensibilidad** si no te escucha (subir) o si se activa sola (bajar).
 
 Mientras está atento, Android muestra una notificación fija. Al detectar el nombre suena un tono y empieza a escucharte.
+El modelo se descarga en la compilación (GitHub Actions); no está versionado en el repo.
 
 ## Estructura
 | Carpeta | Qué es |

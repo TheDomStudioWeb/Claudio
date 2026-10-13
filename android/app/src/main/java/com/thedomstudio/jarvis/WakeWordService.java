@@ -17,27 +17,45 @@ import android.provider.Settings;
 
 import androidx.core.app.NotificationCompat;
 
-import ai.picovoice.porcupine.PorcupineException;
-import ai.picovoice.porcupine.PorcupineManager;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.vosk.Model;
+import org.vosk.Recognizer;
+import org.vosk.android.RecognitionListener;
+import org.vosk.android.SpeechService;
 
-/** Servicio en primer plano que escucha la palabra de activación sin conexión. */
-public class WakeWordService extends Service {
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+/** Servicio en primer plano que escucha el nombre del asistente sin conexión (Vosk, español). */
+public class WakeWordService extends Service implements RecognitionListener {
 
     static final String ACTION_START = "com.thedomstudio.jarvis.WAKE_START";
     private static final String CHANNEL = "wakeword";
     private static final String CHANNEL_ALERT = "wakeword_alert";
     private static final int NOTIF_ID = 7001;
     private static final int NOTIF_WAKE_ID = 7002;
+    private static final String MODEL_ASSET = "vosk-es";
+    private static final float SAMPLE_RATE = 16000f;
 
     static volatile WakeWordService instance;
 
     private final Handler main = new Handler(Looper.getMainLooper());
-    private PorcupineManager manager;
+    private final ExecutorService io = Executors.newSingleThreadExecutor();
+    private Model model;
+    private Recognizer recognizer;
+    private SpeechService speech;
     private boolean paused = false;
-    private String accessKey;
-    private String keywordPath;
-    private float sensitivity = 0.6f;
     private String name = "Claudio";
+    private String key = "claudio";
+    private float minConf = 0.6f;
 
     @Override
     public void onCreate() {
@@ -48,63 +66,155 @@ public class WakeWordService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent != null && ACTION_START.equals(intent.getAction())) {
+            String nm = intent.getStringExtra("name");
+            if (nm != null && !nm.trim().isEmpty()) name = nm.trim();
+            String[] parts = name.toLowerCase(new Locale("es")).split("\\s+");
+            key = parts[parts.length - 1];
+            float sens = intent.getFloatExtra("sensitivity", 0.6f);
+            // Sensibilidad alta = acepta coincidencias con menos confianza.
+            minConf = Math.max(0.2f, Math.min(0.95f, 1.2f - sens));
+            paused = false;
+        }
         Notification n = buildNotification();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
         } else {
             startForeground(NOTIF_ID, n);
         }
-        if (intent != null && ACTION_START.equals(intent.getAction())) {
-            accessKey = intent.getStringExtra("accessKey");
-            keywordPath = intent.getStringExtra("keywordPath");
-            sensitivity = intent.getFloatExtra("sensitivity", 0.6f);
-            String nm = intent.getStringExtra("name");
-            if (nm != null && !nm.isEmpty()) name = nm;
-            NotificationManager nmgr = getSystemService(NotificationManager.class);
-            if (nmgr != null) nmgr.notify(NOTIF_ID, buildNotification());
-            paused = false;
-            init();
-        }
+        init();
         return START_NOT_STICKY;
     }
 
-    /** Recarga el modelo (por ejemplo, tras cargar un .ppn nuevo). */
     void reload() {
-        main.post(this::init);
+        init();
     }
 
     private void init() {
-        release();
-        if (accessKey == null || keywordPath == null) return;
+        final String grammar = new JSONArray().put(key).put("[unk]").toString();
+        io.execute(() -> {
+            try {
+                if (model == null) model = new Model(ensureModel());
+                Recognizer r = new Recognizer(model, SAMPLE_RATE, grammar);
+                r.setWords(true);
+                main.post(() -> {
+                    stopListening();
+                    if (recognizer != null) recognizer.close();
+                    recognizer = r;
+                    if (!paused) startListening();
+                });
+            } catch (Exception e) {
+                WakeWordPlugin.emitError("No se pudo cargar el modelo de voz: " + e.getMessage());
+                main.post(this::stopSelf);
+            }
+        });
+    }
+
+    /** Copia el modelo desde la APK al almacenamiento interno (solo la primera vez o tras actualizar). */
+    private String ensureModel() throws Exception {
+        File dir = new File(getFilesDir(), MODEL_ASSET);
+        long stamp = getPackageManager().getPackageInfo(getPackageName(), 0).lastUpdateTime;
+        File ok = new File(dir, ".ok-" + stamp);
+        if (!ok.exists()) {
+            deleteRecursive(dir);
+            copyAssets(MODEL_ASSET, dir);
+            if (!ok.createNewFile()) throw new IOException("no se pudo marcar el modelo");
+        }
+        return dir.getAbsolutePath();
+    }
+
+    private void copyAssets(String path, File out) throws IOException {
+        String[] list = getAssets().list(path);
+        if (list == null || list.length == 0) {
+            try (InputStream in = getAssets().open(path); OutputStream os = new FileOutputStream(out)) {
+                byte[] buf = new byte[65536];
+                int n;
+                while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
+            } catch (FileNotFoundException emptyDir) {
+                out.mkdirs();
+            }
+            return;
+        }
+        out.mkdirs();
+        for (String child : list) copyAssets(path + "/" + child, new File(out, child));
+    }
+
+    private void deleteRecursive(File f) {
+        File[] kids = f.listFiles();
+        if (kids != null) for (File k : kids) deleteRecursive(k);
+        //noinspection ResultOfMethodCallIgnored
+        f.delete();
+    }
+
+    private void startListening() {
+        if (recognizer == null || speech != null) return;
         try {
-            manager = new PorcupineManager.Builder()
-                .setAccessKey(accessKey)
-                .setKeywordPath(keywordPath)
-                .setModelPath("porcupine_params_es.pv")
-                .setSensitivity(sensitivity)
-                .setErrorCallback(e -> WakeWordPlugin.emitError(e.getMessage()))
-                .build(getApplicationContext(), index -> main.post(this::onWake));
-            if (!paused) manager.start();
-        } catch (PorcupineException e) {
-            WakeWordPlugin.emitError(friendly(e));
-            manager = null;
-            stopSelf();
+            recognizer.reset();
+            speech = new SpeechService(recognizer, SAMPLE_RATE);
+            speech.startListening(this);
+        } catch (IOException e) {
+            speech = null;
+            WakeWordPlugin.emitError("No pude abrir el micrófono: " + e.getMessage());
         }
     }
 
-    private String friendly(PorcupineException e) {
-        String name = e.getClass().getSimpleName();
-        if (name.contains("ActivationLimit")) return "La AccessKey llegó a su límite de dispositivos";
-        if (name.contains("ActivationRefused")) return "Picovoice rechazó la AccessKey";
-        if (name.contains("ActivationThrottled")) return "AccessKey limitada temporalmente; probá más tarde";
-        if (name.contains("Activation")) return "No se pudo validar la AccessKey (¿hay internet?)";
-        if (name.contains("InvalidArgument")) return "El archivo .ppn no es válido para Android/Español o para esta versión";
-        return "Error al iniciar: " + e.getMessage();
+    private void stopListening() {
+        if (speech != null) {
+            speech.stop();
+            speech.shutdown();
+            speech = null;
+        }
+    }
+
+    void pauseDetection() {
+        main.post(() -> {
+            paused = true;
+            stopListening();
+        });
+    }
+
+    void resumeDetection() {
+        main.post(() -> {
+            paused = false;
+            startListening();
+        });
+    }
+
+    private void check(String hypothesis) {
+        if (paused || hypothesis == null) return;
+        try {
+            JSONArray res = new JSONObject(hypothesis).optJSONArray("result");
+            if (res == null) return;
+            for (int i = 0; i < res.length(); i++) {
+                JSONObject w = res.getJSONObject(i);
+                if (key.equals(w.optString("word")) && w.optDouble("conf", 0) >= minConf) {
+                    onWake();
+                    return;
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @Override public void onPartialResult(String hypothesis) {}
+    @Override public void onResult(String hypothesis) { check(hypothesis); }
+    @Override public void onFinalResult(String hypothesis) { check(hypothesis); }
+
+    @Override
+    public void onError(Exception e) {
+        stopListening();
+        main.postDelayed(() -> { if (!paused) startListening(); }, 2000);
+    }
+
+    @Override
+    public void onTimeout() {
+        stopListening();
+        if (!paused) startListening();
     }
 
     private void onWake() {
         if (paused) return;
-        pauseDetection();
+        paused = true;
+        stopListening();
         try {
             ToneGenerator tg = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80);
             tg.startTone(ToneGenerator.TONE_PROP_ACK, 160);
@@ -117,7 +227,6 @@ public class WakeWordService extends Service {
         if (canOpen) {
             try { startActivity(open); } catch (Exception ignored) {}
         } else {
-            // Sin permiso para abrirse sola: aviso tocable.
             PendingIntent pi = PendingIntent.getActivity(this, 1, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
             Notification n = new NotificationCompat.Builder(this, CHANNEL_ALERT)
                 .setSmallIcon(android.R.drawable.ic_btn_speak_now)
@@ -129,36 +238,11 @@ public class WakeWordService extends Service {
                 .build();
             NotificationManager nm = getSystemService(NotificationManager.class);
             if (nm != null) nm.notify(NOTIF_WAKE_ID, n);
-            // Si nadie atiende, vuelve a escuchar en unos segundos.
-            main.postDelayed(() -> { if (WakeWordPlugin.pendingWake) { WakeWordPlugin.pendingWake = false; resumeDetection(); } }, 8000);
+            main.postDelayed(() -> {
+                if (WakeWordPlugin.pendingWake) { WakeWordPlugin.pendingWake = false; resumeDetection(); }
+            }, 8000);
         }
         WakeWordPlugin.emitWake();
-    }
-
-    void pauseDetection() {
-        main.post(() -> {
-            paused = true;
-            if (manager != null) {
-                try { manager.stop(); } catch (PorcupineException ignored) {}
-            }
-        });
-    }
-
-    void resumeDetection() {
-        main.post(() -> {
-            paused = false;
-            if (manager != null) {
-                try { manager.start(); } catch (PorcupineException e) { WakeWordPlugin.emitError(friendly(e)); }
-            }
-        });
-    }
-
-    private void release() {
-        if (manager != null) {
-            try { manager.stop(); } catch (PorcupineException ignored) {}
-            manager.delete();
-            manager = null;
-        }
     }
 
     private void createChannels() {
@@ -177,7 +261,7 @@ public class WakeWordService extends Service {
         return new NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle(name + " está atento")
-            .setContentText("Diga su nombre para hablarle")
+            .setContentText("Diga \"" + name + "\" para hablarle")
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pi)
@@ -187,7 +271,10 @@ public class WakeWordService extends Service {
     @Override
     public void onDestroy() {
         main.removeCallbacksAndMessages(null);
-        release();
+        stopListening();
+        io.shutdownNow();
+        if (recognizer != null) recognizer.close();
+        if (model != null) model.close();
         instance = null;
         super.onDestroy();
     }

@@ -3,3 +3,4 @@ node_modules/
 *.jks
 .DS_Store
 !android/app/debug.keystore
+android/app/src/main/assets/vosk-es/

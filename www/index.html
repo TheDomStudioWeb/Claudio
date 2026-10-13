@@ -205,17 +205,7 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
   <label class="toggle"><div><span>Conversación continua</span><small>Vuelve a escuchar al terminar de hablar</small></div><input type="checkbox" id="cConv"></label>
   <label class="toggle"><div><span>Búsqueda web</span><small>Para noticias, clima, precios y datos actuales</small></div><input type="checkbox" id="cWeb"></label>
   <div id="wakeBox" style="display:none">
-    <label class="toggle"><div><span>Activación por voz</span><small id="wakeHint">Diga el nombre y empieza a escuchar, incluso con la app en segundo plano</small></div><input type="checkbox" id="cWake"></label>
-    <div class="field">
-      <label>AccessKey de Picovoice</label>
-      <input type="password" id="cPvKey" placeholder="Pegue su AccessKey">
-      <small>Gratis para uso personal en <a href="https://console.picovoice.ai/" target="_blank" rel="noopener">console.picovoice.ai</a>.</small>
-    </div>
-    <div class="field">
-      <label>Palabra de activación (.ppn)</label>
-      <input type="file" id="cPpn" accept=".ppn,application/octet-stream" style="color:var(--muted);font:500 15px Rajdhani">
-      <small id="ppnState">En Picovoice Console: Porcupine → idioma Español → escriba "Claudio" → plataforma Android → descargue el .ppn y cárguelo acá.</small>
-    </div>
+    <label class="toggle"><div><span>Activación por voz</span><small id="wakeHint">Diga el nombre y empieza a escuchar, incluso con la app en segundo plano. Funciona sin internet.</small></div><input type="checkbox" id="cWake"></label>
     <div class="field"><label>Sensibilidad <span id="vSens"></span></label><input type="range" id="cSens" min=".3" max=".9" step=".05">
       <small>Más alta: lo escucha mejor, pero se activa más por error.</small></div>
     <div class="btns" style="margin-top:4px"><button class="btn ghost" id="btnOverlay">Permitir abrir sobre otras apps</button></div>
@@ -506,12 +496,12 @@ $('#btnCfg').onclick = () => openSheet('#cfgSheet');
 $('#btnLog').onclick = () => openSheet('#logSheet');
 
 function fillCfg(){
-  $('#cKey').value = cfg.key; $('#cAName').value = cfg.aname; $('#cWake').checked = cfg.wake; $('#cPvKey').value = cfg.pvKey; $('#cSens').value = cfg.sens; refreshWakeUi(); $('#cModel').value = cfg.model; $('#cName').value = cfg.name; $('#cCtx').value = cfg.ctx;
+  $('#cKey').value = cfg.key; $('#cAName').value = cfg.aname; $('#cWake').checked = cfg.wake; $('#cSens').value = cfg.sens; refreshWakeUi(); $('#cModel').value = cfg.model; $('#cName').value = cfg.name; $('#cCtx').value = cfg.ctx;
   $('#cVoice').value = cfg.voice; $('#cRate').value = cfg.rate; $('#cPitch').value = cfg.pitch;
   $('#cConv').checked = cfg.converse; $('#cWeb').checked = cfg.web; updRanges();
 }
 function readCfg(){
-  cfg = {...cfg, aname: $('#cAName').value.trim() || 'Claudio', wake: $('#cWake').checked, pvKey: $('#cPvKey').value.trim(), sens: +$('#cSens').value, key: $('#cKey').value.trim(), model: $('#cModel').value, name: $('#cName').value.trim() || 'señor',
+  cfg = {...cfg, aname: $('#cAName').value.trim() || 'Claudio', wake: $('#cWake').checked, sens: +$('#cSens').value, key: $('#cKey').value.trim(), model: $('#cModel').value, name: $('#cName').value.trim() || 'señor',
     ctx: $('#cCtx').value.trim(), voice: $('#cVoice').value, rate: +$('#cRate').value, pitch: +$('#cPitch').value,
     converse: $('#cConv').checked, web: $('#cWeb').checked};
 }
@@ -545,12 +535,9 @@ $('#boot').onclick = () => bootDone(true);
 /* ---------- Activación por voz (solo APK) ---------- */
 async function refreshWakeUi(){
   if (!WK) return;
-  $('#wakeHint').textContent = 'Diga "' + AN() + '" y empieza a escuchar, incluso con la app en segundo plano';
+  $('#wakeHint').textContent = 'Diga "' + AN() + '" y empieza a escuchar, incluso con la app en segundo plano. Funciona sin internet; la primera vez tarda unos segundos en prepararse.';
   try {
     const st = await WK.status();
-    $('#ppnState').textContent = st.hasKeyword
-      ? 'Palabra de activación cargada ✓ (puede reemplazarla eligiendo otro archivo)'
-      : 'En Picovoice Console: Porcupine → idioma Español → escriba "' + AN() + '" → plataforma Android → descargue el .ppn y cárguelo acá.';
     $('#overlayState').textContent = st.canOverlay
       ? 'Permiso para abrirse sobre otras apps concedido ✓'
       : 'Necesario para que la app se abra sola cuando la llame desde otra pantalla.';
@@ -560,7 +547,7 @@ async function syncWake(verbose){
   if (!WK) return;
   try {
     if (cfg.wake){
-      await WK.start({accessKey: cfg.pvKey, sensitivity: cfg.sens, name: AN()});
+      await WK.start({sensitivity: cfg.sens, name: AN()});
       if (verbose) toast('Escuchando la palabra "' + AN() + '".', 2500);
     } else await WK.stop();
   } catch (e){
@@ -569,18 +556,6 @@ async function syncWake(verbose){
 }
 if (WK){
   $('#wakeBox').style.display = 'block';
-  $('#cPpn').onchange = e => {
-    const f = e.target.files && e.target.files[0]; if (!f) return;
-    const r = new FileReader();
-    r.onload = async () => {
-      try {
-        await WK.saveKeyword({base64: String(r.result).split(',')[1]});
-        toast('Palabra de activación guardada.', 2000);
-        refreshWakeUi();
-      } catch (err){ toast('No pude guardar el archivo: ' + ((err && err.message) || err)); }
-    };
-    r.readAsDataURL(f);
-  };
   $('#btnOverlay').onclick = () => WK.openOverlaySettings().catch(() => {});
   WK.addListener('wake', () => {
     bootDone(false);
