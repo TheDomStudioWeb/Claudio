@@ -99,6 +99,7 @@ public class WakeWordPlugin extends Plugin {
 
     @PluginMethod
     public void stop(PluginCall call) {
+        WakeWordService.prefs(getContext()).edit().putBoolean("enabled", false).apply();
         getContext().stopService(new Intent(getContext(), WakeWordService.class));
         call.resolve();
     }

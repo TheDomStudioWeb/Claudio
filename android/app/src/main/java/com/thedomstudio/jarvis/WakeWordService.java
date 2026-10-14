@@ -5,7 +5,9 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ServiceInfo;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
@@ -56,6 +58,13 @@ public class WakeWordService extends Service implements RecognitionListener {
     private String name = "Claudio";
     private String key = "claudio";
     private float minConf = 0.6f;
+    private float sens = 0.6f;
+    private static final long AUTO_RESUME_MS = 60000L;
+    private final Runnable autoResume = () -> resumeDetection();
+
+    static SharedPreferences prefs(Context c) {
+        return c.getSharedPreferences("claudio_wake", Context.MODE_PRIVATE);
+    }
 
     @Override
     public void onCreate() {
@@ -66,24 +75,36 @@ public class WakeWordService extends Service implements RecognitionListener {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        SharedPreferences sp = prefs(this);
         if (intent != null && ACTION_START.equals(intent.getAction())) {
-            String nm = intent.getStringExtra("name");
+            sp.edit().putString("name", intent.getStringExtra("name"))
+                .putFloat("sens", intent.getFloatExtra("sensitivity", 0.6f))
+                .putBoolean("enabled", true).apply();
+        }
+        {
+            String nm = sp.getString("name", "Claudio");
             if (nm != null && !nm.trim().isEmpty()) name = nm.trim();
             String[] parts = name.toLowerCase(new Locale("es")).split("\\s+");
             key = parts[parts.length - 1];
-            float sens = intent.getFloatExtra("sensitivity", 0.6f);
+            sens = sp.getFloat("sens", 0.6f);
             // Sensibilidad alta = acepta coincidencias con menos confianza.
             minConf = Math.max(0.2f, Math.min(0.95f, 1.2f - sens));
             paused = false;
         }
         Notification n = buildNotification();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
-        } else {
-            startForeground(NOTIF_ID, n);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIF_ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE);
+            } else {
+                startForeground(NOTIF_ID, n);
+            }
+        } catch (Exception e) {
+            // Android no permite abrir el micrófono desde segundo plano: se reactivará al abrir la app.
+            stopSelf();
+            return START_NOT_STICKY;
         }
         init();
-        return START_NOT_STICKY;
+        return START_STICKY;
     }
 
     void reload() {
@@ -170,14 +191,33 @@ public class WakeWordService extends Service implements RecognitionListener {
         main.post(() -> {
             paused = true;
             stopListening();
+            // Red de seguridad: si nadie la reactiva, vuelve a escuchar sola.
+            main.removeCallbacks(autoResume);
+            main.postDelayed(autoResume, AUTO_RESUME_MS);
+            updateNotification();
         });
     }
 
     void resumeDetection() {
         main.post(() -> {
+            main.removeCallbacks(autoResume);
             paused = false;
             startListening();
+            updateNotification();
         });
+    }
+
+    /** Reanuda tras una pausa breve (por ejemplo, cuando el usuario sale de la app). */
+    void resumeSoon(long delayMs) {
+        main.post(() -> {
+            main.removeCallbacks(autoResume);
+            main.postDelayed(autoResume, delayMs);
+        });
+    }
+
+    private void updateNotification() {
+        NotificationManager nm = getSystemService(NotificationManager.class);
+        if (nm != null) nm.notify(NOTIF_ID, buildNotification());
     }
 
     private void check(String hypothesis) {
@@ -215,6 +255,8 @@ public class WakeWordService extends Service implements RecognitionListener {
         if (paused) return;
         paused = true;
         stopListening();
+        main.removeCallbacks(autoResume);
+        main.postDelayed(autoResume, AUTO_RESUME_MS);
         try {
             ToneGenerator tg = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 80);
             tg.startTone(ToneGenerator.TONE_PROP_ACK, 160);
@@ -260,8 +302,8 @@ public class WakeWordService extends Service implements RecognitionListener {
         PendingIntent pi = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         return new NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setContentTitle(name + " está atento")
-            .setContentText("Diga \"" + name + "\" para hablarle")
+            .setContentTitle(paused ? name + " está conversando" : name + " está atento")
+            .setContentText(paused ? "Vuelve a escuchar su nombre al terminar" : "Diga \"" + name + "\" para hablarle")
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pi)
