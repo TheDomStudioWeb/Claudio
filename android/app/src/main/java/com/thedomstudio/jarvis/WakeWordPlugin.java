@@ -178,7 +178,7 @@ public class WakeWordPlugin extends Plugin {
         final String lang = call.getString("language", "es-AR");
         final boolean beep = Boolean.TRUE.equals(call.getBoolean("beep", true));
         final int session = ++sttSession;
-        ui.post(() -> startRecognizer(lang, beep, session, 0));
+        ui.post(() -> startRecognizer(lang, beep, session, 0, false));
         call.resolve();
     }
 
@@ -190,7 +190,7 @@ public class WakeWordPlugin extends Plugin {
         }
     }
 
-    private void startRecognizer(final String lang, final boolean beep, final int session, final int attempt) {
+    private void startRecognizer(final String lang, final boolean beep, final int session, final int attempt, final boolean offline) {
         if (session != sttSession) return;
         if (!SpeechRecognizer.isRecognitionAvailable(getContext())) {
             emitStt("error", "El reconocimiento de voz no está disponible en este teléfono", -1);
@@ -230,11 +230,21 @@ public class WakeWordPlugin extends Plugin {
                     || ((error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT) && elapsed < 1500);
                 if (transient_ && !spoke[0] && attempt < 3) {
                     // Falla típica justo después de que habló el sintetizador: reintentar.
-                    ui.postDelayed(() -> startRecognizer(lang, beep, session, attempt + 1), 350L * (attempt + 1));
+                    ui.postDelayed(() -> startRecognizer(lang, beep, session, attempt + 1, offline), 350L * (attempt + 1));
+                    return;
+                }
+                boolean network = error == SpeechRecognizer.ERROR_NETWORK
+                    || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT
+                    || error == SpeechRecognizer.ERROR_SERVER;
+                if (network && !offline) {
+                    // Señal débil: reintentar con el reconocimiento sin conexión del teléfono.
+                    emitStt("retry", "Señal débil, sigo escuchando…", error);
+                    ui.postDelayed(() -> startRecognizer(lang, false, session, attempt + 1, true), 300L);
                     return;
                 }
                 boolean silence = error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT;
-                emitStt(silence ? "silence" : "error", silence ? null : "código " + error, error);
+                String why = network ? "sin conexión para reconocer la voz" : "código " + error;
+                emitStt(silence ? "silence" : "error", silence ? null : why, error);
             }
         });
         Intent intent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
@@ -243,6 +253,7 @@ public class WakeWordPlugin extends Plugin {
         intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
         intent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
         intent.putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, getContext().getPackageName());
+        if (offline) intent.putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true);
         intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1600L);
         intent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 1600L);
         try {

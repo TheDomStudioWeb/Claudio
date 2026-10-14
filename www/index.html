@@ -328,7 +328,9 @@ function speak(text){
   text = clean(text);
   if (!text || (!NATIVE && !synth)) return;
   const g = gen, v = pickVoice();
-  const done = () => { if (g !== gen) return; pending--; checkDone(); };
+  let fired = false;
+  const done = () => { if (fired) return; fired = true; clearTimeout(wd); if (g !== gen) return; pending--; checkDone(); };
+  const wd = setTimeout(done, 4000 + text.length * 110 / (cfg.rate || 1)); // por si el motor de voz no avisa
   pending++; setState('speaking');
   if (NATIVE){
     const o = {text, lang: v ? v.lang : 'es-AR', rate: cfg.rate, pitch: cfg.pitch, volume: 1, queueStrategy: 1};
@@ -360,6 +362,7 @@ function stopAll(){
 }
 // Corta el texto en oraciones completas para empezar a hablar mientras llega la respuesta.
 function flushSentences(buf){
+  if (buf.length < 80) return buf; // juntar al menos una frase completa y algo más
   const re = /[.!?…;:\n](?=\s)/g; let last = -1, m;
   while ((m = re.exec(buf))) last = m.index;
   if (last >= 0){ speak(buf.slice(0, last + 1)); return buf.slice(last + 1); }
@@ -405,6 +408,7 @@ async function listenNative(opts = {}){
       else if (ev.type === 'end') arm(2500);
       else if (ev.type === 'final'){ if (ev.text) last = ev.text; finish(); }
       else if (ev.type === 'silence') finish();
+      else if (ev.type === 'retry'){ capUser(ev.text || 'Lo escucho…'); arm(9000); }
       else if (ev.type === 'error'){ if (!last) toast('Micrófono: ' + (ev.text || 'error')); finish(); }
     });
     arm(6000); // si el reconocedor ni siquiera arranca
@@ -585,9 +589,13 @@ async function callClaude(messages, onText){
     throw new Error(msg);
   }
   const reader = res.body.getReader(), dec = new TextDecoder();
-  const blocks = []; let stop = null, sse = '';
-  while (true){
-    const {done, value} = await reader.read();
+  const blocks = []; let stop = null, sse = '', finished = false;
+  const readWithTimeout = () => new Promise((resolve, reject) => {
+    const t = setTimeout(() => { try { reader.cancel(); } catch {} reject(new Error('stall: la conexión dejó de responder')); }, 25000);
+    reader.read().then(r => { clearTimeout(t); resolve(r); }, e => { clearTimeout(t); reject(e); });
+  });
+  while (!finished){
+    const {done, value} = await readWithTimeout();
     if (done) break;
     sse += dec.decode(value, {stream:true});
     const lines = sse.split('\n'); sse = lines.pop();
@@ -612,6 +620,9 @@ async function callClaude(messages, onText){
         if (b && b._json !== undefined){ try { b.input = b._json ? JSON.parse(b._json) : {}; } catch { b.input = {}; } delete b._json; }
       } else if (ev.type === 'message_delta'){
         stop = ev.delta && ev.delta.stop_reason;
+      } else if (ev.type === 'message_stop'){
+        finished = true; // no esperar a que la red móvil cierre la conexión
+        try { reader.cancel(); } catch {}
       } else if (ev.type === 'error'){
         throw new Error(ev.error && ev.error.message || 'error de transmisión');
       }
@@ -627,7 +638,7 @@ function explainError(msg){
   if (/not_found|model/.test(m) && /not found|does not exist|invalid model/.test(m)) return 'El modelo elegido no está disponible. Elija otro núcleo en Protocolos.';
   if (/rate|429/.test(m)) return 'Recibí demasiadas consultas seguidas. Espere un minuto y vuelva a intentar.';
   if (/overloaded|529|5\d\d/.test(m)) return 'Los servidores de Anthropic están saturados en este momento. Pruebe de nuevo en unos minutos.';
-  if (/failed to fetch|network|load failed/.test(m)) return 'No tengo conexión a internet o la señal es muy débil.';
+  if (/failed to fetch|network|load failed|stall/.test(m)) return 'La conexión a internet está muy lenta o se cortó. Pruebe de nuevo o pase a Wi-Fi.';
   if (/tool|web_search/.test(m)) return 'Falló la búsqueda web. Pruebe desactivándola en Protocolos.';
   return 'Tuve un problema de conexión con mis sistemas.';
 }
@@ -636,7 +647,7 @@ async function ask(text){
   if (!cfg.key){ toast('Primero configure su clave de API en Protocolos.'); openSheet('#cfgSheet'); return; }
   stopAll(); stopped = false;
   if (mem.speaker && Date.now() - mem.lastAt > 20 * 60e3){ mem.speaker = null; renderWho(); } // tras 20 min, vuelve a ser usted
-  mem.lastAt = Date.now(); saveMem();
+  mem.lastAt = Date.now(); saveMem(); ask._retried = false;
   capUser(text); capBot('');
   const userMsg = {role:'user', content:text, who: speakerLabel()};
   history.push(userMsg);
@@ -648,7 +659,15 @@ async function ask(text){
   try {
     const msgs = buildMessages();
     for (let round = 0; round < 5; round++){
-      const r = await callClaude(msgs, onText);
+      let r;
+      try { r = await callClaude(msgs, onText); }
+      catch (err){
+        const net = /failed to fetch|network|load failed|stall|overloaded|529|5\d\d/i.test(String(err && err.message));
+        if (!net || full || abortCtrl.signal.aborted || round > 0 || ask._retried) throw err;
+        ask._retried = true; capBot('Reconectando…');
+        await new Promise(res => setTimeout(res, 1500));
+        r = await callClaude(msgs, onText);
+      }
       if (r.stop === 'pause_turn'){ msgs.push({role:'assistant', content: r.blocks}); continue; }
       if (r.stop !== 'tool_use') break;
       const uses = r.blocks.filter(b => b.type === 'tool_use');
