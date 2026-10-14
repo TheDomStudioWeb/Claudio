@@ -603,6 +603,8 @@ async function callClaude(messages, onText){
         const b = blocks[ev.index], d = ev.delta || {};
         if (!b) continue;
         if (d.type === 'text_delta'){ b.text += d.text; onText(d.text); }
+        else if (d.type === 'thinking_delta') b.thinking = (b.thinking || '') + (d.thinking || '');
+        else if (d.type === 'signature_delta') b.signature = (b.signature || '') + (d.signature || '');
         else if (d.type === 'input_json_delta') b._json += d.partial_json || '';
         else if (d.type === 'citations_delta'){ (b.citations = b.citations || []).push(d.citation); }
       } else if (ev.type === 'content_block_stop'){
@@ -615,7 +617,7 @@ async function callClaude(messages, onText){
       }
     }
   }
-  return {blocks: blocks.filter(b => b && !(b.type === 'text' && !b.text)), stop};
+  return {blocks: blocks.filter(b => b && !(b.type === 'text' && !b.text) && !(b.type === 'thinking' && !b.thinking && !b.signature)), stop};
 }
 
 function explainError(msg){
