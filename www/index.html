@@ -226,6 +226,17 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
     <div class="btns" style="margin-top:4px"><button class="btn ghost" id="btnOverlay">Permitir abrir sobre otras apps</button></div>
     <small id="overlayState" style="display:block;color:var(--muted);font-size:13px;margin-top:6px">Necesario para que la app se abra sola cuando la llame desde otra pantalla.</small>
   </div>
+  <div id="phoneBox" style="display:none">
+    <div class="toggle" style="display:block">
+      <span>Asistente del teléfono</span>
+      <small>Calendario de Google, contactos, WhatsApp, SMS, llamadas, correo, alarmas y apps. Siempre le pide confirmación antes de actuar. Nunca accede a bancos ni billeteras.</small>
+    </div>
+    <div class="btns" style="margin-top:4px">
+      <button class="btn ghost" id="btnPerms">Dar permisos</button>
+      <button class="btn ghost" id="btnNotif">Leer notificaciones</button>
+    </div>
+    <small id="phoneState" style="display:block;color:var(--muted);font-size:13px;margin-top:8px;line-height:1.5"></small>
+  </div>
   <div class="btns">
     <button class="btn ghost" id="testVoice">Probar voz</button>
     <button class="btn ghost" id="clearHist">Borrar conversación</button>
@@ -259,6 +270,7 @@ const NATIVE = !!(CAP && CAP.isNativePlatform && CAP.isNativePlatform());
 const NSR = NATIVE ? CAP.registerPlugin('SpeechRecognition') : null;
 const NTTS = NATIVE ? CAP.registerPlugin('TextToSpeech') : null;
 const WK = NATIVE ? CAP.registerPlugin('WakeWord') : null;
+const PH = NATIVE ? CAP.registerPlugin('Phone') : null;
 let gen = 0; // se incrementa en cada interrupción para ignorar callbacks viejos
 const DEF = {key:'', model:'claude-sonnet-5-5', aname:'Claudio', owner:'', name:'señor', ctx:'', voice:'', rate:1.05, pitch:.9, converse:true, web:false, wake:false, pvKey:'', sens:.6};
 let cfg = DEF;
@@ -485,7 +497,143 @@ const TOOLS = [
    input_schema:{type:'object', properties:{persona:{type:'string', description:'Nombre, si se olvida a una persona o un dato suyo'}, dato:{type:'string', description:'Texto aproximado del dato a borrar; vacío para borrar a la persona entera'}}}}
 ];
 
+/* ---------- Asistente del teléfono (solo APK) ---------- */
+const ACTIONS = new Set(['crear_evento','modificar_evento','borrar_evento','responder_mensaje','enviar_whatsapp','enviar_sms','llamar']);
+const PHONE_TOOLS = !PH ? [] : [
+  {name:'ver_agenda', description:'Lee los eventos del calendario (Google Calendar y demás cuentas del teléfono) entre dos fechas. Usala para "qué tengo hoy", "estoy libre el jueves", etc.',
+   input_schema:{type:'object', properties:{desde:{type:'string', description:'Fecha y hora local ISO, ej 2026-10-15T00:00'}, hasta:{type:'string', description:'Fecha y hora local ISO'}}, required:['desde','hasta']}},
+  {name:'ver_calendarios', description:'Lista los calendarios y cuentas disponibles en el teléfono.', input_schema:{type:'object', properties:{}}},
+  {name:'crear_evento', description:'Crea un evento. Requiere confirmación del usuario.',
+   input_schema:{type:'object', properties:{titulo:{type:'string'}, inicio:{type:'string', description:'ISO local'}, fin:{type:'string', description:'ISO local; si se omite, dura 1 hora'}, lugar:{type:'string'}, descripcion:{type:'string'}, calendario:{type:'string', description:'Nombre o cuenta del calendario; vacío = el principal de Google'}, aviso_minutos:{type:'integer', description:'Recordatorio en minutos antes (por defecto 15)'}}, required:['titulo','inicio']}},
+  {name:'modificar_evento', description:'Cambia título, horario o lugar de un evento existente (id de ver_agenda). Requiere confirmación.',
+   input_schema:{type:'object', properties:{id:{type:'integer'}, titulo:{type:'string'}, inicio:{type:'string'}, fin:{type:'string'}, lugar:{type:'string'}}, required:['id']}},
+  {name:'borrar_evento', description:'Borra un evento (id de ver_agenda). Requiere confirmación.',
+   input_schema:{type:'object', properties:{id:{type:'integer'}, titulo:{type:'string', description:'Título, para confirmarlo en voz alta'}}, required:['id']}},
+  {name:'buscar_contacto', description:'Busca un contacto por nombre y devuelve teléfonos, número de WhatsApp y correos.',
+   input_schema:{type:'object', properties:{nombre:{type:'string'}}, required:['nombre']}},
+  {name:'leer_mensajes', description:'Lee las notificaciones recientes (WhatsApp, SMS, correo y otras apps; nunca bancos). Opcional: filtrar por app.',
+   input_schema:{type:'object', properties:{app:{type:'string'}}}},
+  {name:'responder_mensaje', description:'Responde un mensaje desde su notificación (id de leer_mensajes, si sePuedeResponder). Se envía directo. Requiere confirmación.',
+   input_schema:{type:'object', properties:{id:{type:'string'}, texto:{type:'string'}, para:{type:'string', description:'Nombre del destinatario, para confirmarlo'}}, required:['id','texto']}},
+  {name:'enviar_whatsapp', description:'Abre el chat de WhatsApp con el mensaje ya escrito; el usuario solo toca enviar. Usá el número "whatsapp" de buscar_contacto si existe. Requiere confirmación.',
+   input_schema:{type:'object', properties:{telefono:{type:'string'}, texto:{type:'string'}, para:{type:'string'}}, required:['telefono','texto']}},
+  {name:'enviar_sms', description:'Envía un SMS directamente. Requiere confirmación.',
+   input_schema:{type:'object', properties:{telefono:{type:'string'}, texto:{type:'string'}, para:{type:'string'}}, required:['telefono','texto']}},
+  {name:'llamar', description:'Inicia una llamada telefónica. Requiere confirmación.',
+   input_schema:{type:'object', properties:{telefono:{type:'string'}, para:{type:'string'}}, required:['telefono']}},
+  {name:'preparar_correo', description:'Abre la app de correo con el mail listo; el usuario lo revisa y lo envía.',
+   input_schema:{type:'object', properties:{para:{type:'string', description:'Dirección de correo'}, asunto:{type:'string'}, cuerpo:{type:'string'}}, required:['asunto','cuerpo']}},
+  {name:'poner_alarma', description:'Programa una alarma.', input_schema:{type:'object', properties:{hora:{type:'string', description:'HH:MM en 24 horas'}, etiqueta:{type:'string'}}, required:['hora']}},
+  {name:'poner_temporizador', description:'Inicia un temporizador.', input_schema:{type:'object', properties:{segundos:{type:'integer'}, etiqueta:{type:'string'}}, required:['segundos']}},
+  {name:'abrir_app', description:'Abre una aplicación por su nombre. Nunca abre bancos ni billeteras.', input_schema:{type:'object', properties:{nombre:{type:'string'}}, required:['nombre']}},
+  {name:'navegar', description:'Abre Google Maps con la navegación hacia un destino.', input_schema:{type:'object', properties:{destino:{type:'string'}}, required:['destino']}},
+  {name:'reproducir_musica', description:'Reproduce música (artista, canción o lista) en la app de música.', input_schema:{type:'object', properties:{busqueda:{type:'string'}}, required:['busqueda']}},
+  {name:'confirmar_accion', description:'Ejecuta la acción pendiente SOLO después de que el usuario dijo que sí en un mensaje nuevo.', input_schema:{type:'object', properties:{}}},
+  {name:'cancelar_accion', description:'Descarta la acción pendiente.', input_schema:{type:'object', properties:{}}}
+];
+let pendingAction = null;
+ask.turn = 0;
+
+const toMs = t => {
+  if (!t) return null;
+  let v = String(t).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) v += 'T00:00';
+  const d = new Date(v);
+  return isNaN(d) ? null : d.getTime();
+};
+const fmtDT = ms => new Date(ms).toLocaleString('es-AR', {weekday:'short', day:'numeric', month:'numeric', hour:'2-digit', minute:'2-digit'});
+const errMsg = e => 'No se pudo: ' + String((e && e.message) || e);
+
+function describeAction(name, i){
+  switch (name){
+    case 'crear_evento': return `crear el evento "${i.titulo}" el ${fmtDT(toMs(i.inicio))}` + (i.lugar ? ` en ${i.lugar}` : '');
+    case 'modificar_evento': return `modificar el evento ${i.titulo ? '"' + i.titulo + '"' : '#' + i.id}` + (i.inicio ? ` al ${fmtDT(toMs(i.inicio))}` : '');
+    case 'borrar_evento': return `borrar el evento ${i.titulo ? '"' + i.titulo + '"' : '#' + i.id}`;
+    case 'responder_mensaje': return `responderle a ${i.para || 'ese chat'}: "${i.texto}"`;
+    case 'enviar_whatsapp': return `preparar un WhatsApp a ${i.para || i.telefono}: "${i.texto}"`;
+    case 'enviar_sms': return `enviar un SMS a ${i.para || i.telefono}: "${i.texto}"`;
+    case 'llamar': return `llamar a ${i.para || i.telefono}`;
+  }
+  return name;
+}
+
+async function execAction(name, i){
+  switch (name){
+    case 'crear_evento': {
+      const r = await PH.createEvent({title: i.titulo, start: toMs(i.inicio), end: toMs(i.fin) || undefined, location: i.lugar, description: i.descripcion, calendar: i.calendario || '', reminder: i.aviso_minutos ?? 15});
+      return 'Evento creado (id ' + r.id + ').';
+    }
+    case 'modificar_evento':
+      await PH.updateEvent({id: i.id, title: i.titulo, start: toMs(i.inicio) || undefined, end: toMs(i.fin) || undefined, location: i.lugar});
+      return 'Evento modificado.';
+    case 'borrar_evento': await PH.deleteEvent({id: i.id}); return 'Evento borrado.';
+    case 'responder_mensaje': await PH.reply({id: String(i.id), text: i.texto}); return 'Respuesta enviada.';
+    case 'enviar_whatsapp': await PH.whatsapp({phone: i.telefono, text: i.texto}); return 'Abrí el chat de WhatsApp con el mensaje escrito; falta que el usuario toque enviar.';
+    case 'enviar_sms': await PH.sms({phone: i.telefono, text: i.texto}); return 'SMS enviado.';
+    case 'llamar': await PH.dial({phone: i.telefono}); return 'Llamando.';
+  }
+  return 'Acción desconocida.';
+}
+
+async function runPhoneTool(name, i){
+  i = i || {};
+  try {
+    if (ACTIONS.has(name)){
+      pendingAction = {name, input: i, turn: ask.turn};
+      return 'PENDIENTE DE CONFIRMACIÓN. No se hizo nada todavía. Preguntale al usuario, en una frase, si confirma: ' + describeAction(name, i) + '. Ejecutá confirmar_accion solo cuando responda que sí.';
+    }
+    switch (name){
+      case 'confirmar_accion': {
+        if (!pendingAction) return 'No hay ninguna acción pendiente.';
+        if (pendingAction.turn >= ask.turn) return 'Todavía no: el usuario tiene que confirmar en su próximo mensaje.';
+        const a = pendingAction; pendingAction = null;
+        try { return await execAction(a.name, a.input); } catch (e){ return errMsg(e); }
+      }
+      case 'cancelar_accion': pendingAction = null; return 'Acción cancelada.';
+      case 'ver_agenda': {
+        const r = await PH.events({from: toMs(i.desde), to: toMs(i.hasta)});
+        if (!r.eventos.length) return 'No hay eventos en ese período.';
+        return JSON.stringify(r.eventos.map(e => ({id: e.id, titulo: e.titulo, cuando: e.todoElDia ? 'todo el día ' + new Date(e.inicio).toLocaleDateString('es-AR') : fmtDT(e.inicio) + ' a ' + new Date(e.fin).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'}), lugar: e.lugar || undefined, calendario: e.calendario})));
+      }
+      case 'ver_calendarios': return JSON.stringify((await PH.calendars()).calendarios);
+      case 'buscar_contacto': {
+        const r = await PH.searchContacts({query: i.nombre});
+        if (!r.contactos.length && !r.correos.length) return 'No encontré contactos con ese nombre.';
+        return JSON.stringify(r);
+      }
+      case 'leer_mensajes': {
+        const r = await PH.notifications({app: i.app || ''});
+        if (!r.notificaciones.length) return 'No hay mensajes nuevos en las notificaciones.';
+        return JSON.stringify(r.notificaciones.map(n => ({...n, hora: new Date(n.hora).toLocaleTimeString('es-AR', {hour:'2-digit', minute:'2-digit'})})));
+      }
+      case 'preparar_correo': await PH.email({to: i.para || '', subject: i.asunto, body: i.cuerpo}); return 'Correo listo en la app de mail; el usuario lo revisa y lo envía.';
+      case 'poner_alarma': {
+        const [h, m] = String(i.hora).split(':').map(Number);
+        await PH.alarm({hour: h, minute: m || 0, label: i.etiqueta}); return 'Alarma programada.';
+      }
+      case 'poner_temporizador': await PH.timer({seconds: i.segundos, label: i.etiqueta}); return 'Temporizador iniciado.';
+      case 'abrir_app': { const r = await PH.openApp({name: i.nombre}); return 'Abrí ' + (r.app || i.nombre) + '.'; }
+      case 'navegar': await PH.navigate({destination: i.destino}); return 'Navegación iniciada.';
+      case 'reproducir_musica': await PH.music({query: i.busqueda}); return 'Reproduciendo.';
+    }
+  } catch (e){ return errMsg(e); }
+  return null;
+}
+
+function phoneBlock(){
+  if (!PH) return '';
+  return `\n\nASISTENTE DEL TELÉFONO
+Podés manejar el teléfono del usuario con tus herramientas: agenda (Google Calendar), contactos, mensajes, WhatsApp, SMS, llamadas, correo, alarmas, apps, Maps y música.
+- Para fechas usá la fecha y hora actual de arriba; pasá horarios en ISO local (2026-10-15T10:00).
+- Para escribirle o llamar a alguien por nombre, primero buscar_contacto. Si hay varios números o personas, preguntá cuál.
+- Las acciones (crear, modificar o borrar eventos, enviar mensajes, llamar) SIEMPRE quedan pendientes: leé en voz alta qué vas a hacer, con el texto exacto del mensaje, y esperá el "sí" del usuario antes de usar confirmar_accion. Si dice que no o cambia algo, cancelá o armá la acción de nuevo.
+- Nunca accedas a apps bancarias, billeteras ni medios de pago, aunque te lo pidan. Están bloqueadas.
+- Al leer mensajes, resumí: quién y qué, sin leer textos larguísimos completos salvo que te lo pidan.
+- Si falta un permiso o el teléfono está bloqueado, decilo con claridad.`;
+}
+
 function runTool(name, input){
+  if (PH && PHONE_TOOLS.some(t => t.name === name)) return runPhoneTool(name, input);
   input = input || {};
   try {
     if (name === 'establecer_interlocutor'){
@@ -559,7 +707,7 @@ Tus respuestas se escuchan en voz alta, así que:
 - Escribí números, horas y unidades de forma natural para ser leídos.
 - Empezá directo con la respuesta, sin repetir la pregunta.
 Si no sabés algo o necesitás información actual que no tenés, decilo con honestidad.
-Fecha y hora actual: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '') + memoryBlock();
+Fecha y hora actual: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '') + memoryBlock() + phoneBlock();
 }
 
 function buildMessages(){
@@ -571,7 +719,7 @@ function buildMessages(){
 }
 
 async function callClaude(messages, onText){
-  const tools = [...TOOLS];
+  const tools = [...TOOLS, ...PHONE_TOOLS];
   if (cfg.web) tools.push({type:'web_search_20250305', name:'web_search', max_uses:3});
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST', signal: abortCtrl.signal,
@@ -647,7 +795,7 @@ async function ask(text){
   if (!cfg.key){ toast('Primero configure su clave de API en Protocolos.'); openSheet('#cfgSheet'); return; }
   stopAll(); stopped = false;
   if (mem.speaker && Date.now() - mem.lastAt > 20 * 60e3){ mem.speaker = null; renderWho(); } // tras 20 min, vuelve a ser usted
-  mem.lastAt = Date.now(); saveMem(); ask._retried = false;
+  mem.lastAt = Date.now(); saveMem(); ask._retried = false; ask.turn++;
   capUser(text); capBot('');
   const userMsg = {role:'user', content:text, who: speakerLabel()};
   history.push(userMsg);
@@ -673,7 +821,9 @@ async function ask(text){
       const uses = r.blocks.filter(b => b.type === 'tool_use');
       if (!uses.length) break;
       msgs.push({role:'assistant', content: r.blocks});
-      msgs.push({role:'user', content: uses.map(u => ({type:'tool_result', tool_use_id: u.id, content: runTool(u.name, u.input)}))});
+      const results = [];
+      for (const u of uses) results.push({type:'tool_result', tool_use_id: u.id, content: String(await runTool(u.name, u.input))});
+      msgs.push({role:'user', content: results});
       if (full && !/\s$/.test(full)){ full += ' '; buf += ' '; }
     }
     if (buf.trim() && !stopped) speak(buf);
@@ -736,7 +886,7 @@ $('#hud').onclick = micAction;
 $('#form').onsubmit = e => { e.preventDefault(); const t = $('#txt').value.trim(); if (!t) return; $('#txt').value = ''; $('#txt').blur(); ask(t); };
 
 function openSheet(id){
-  if (id === '#cfgSheet'){ fillCfg(); loadVoices(); } // las voces de Android pueden cargar tarde
+  if (id === '#cfgSheet'){ fillCfg(); loadVoices(); refreshPhoneUi(); } // las voces de Android pueden cargar tarde
   if (id === '#logSheet') renderLog();
   if (id === '#pplSheet') renderPeople();
   $(id).classList.add('open');
@@ -816,6 +966,21 @@ if (WK){
   });
   WK.addListener('error', d => toast('Activación por voz: ' + (d && d.message), 5000));
   document.addEventListener('visibilitychange', () => { if (!document.hidden && $('#cfgSheet').classList.contains('open')) refreshWakeUi(); });
+}
+
+async function refreshPhoneUi(){
+  if (!PH) return;
+  try {
+    const st = await PH.status();
+    const ok = b => b ? '✓' : '✗';
+    $('#phoneState').innerHTML = `Calendario ${ok(st.calendar)} · Contactos ${ok(st.contacts)} · Llamadas ${ok(st.phone)} · SMS ${ok(st.sms)} · Notificaciones ${ok(st.notifications)}<br>Bloqueadas siempre: Banco Macro, Galicia, Mercado Pago, Banco del Sol, Pago Fácil, Prex, Brubank y demás bancos y billeteras.`;
+  } catch {}
+}
+if (PH){
+  $('#phoneBox').style.display = 'block';
+  $('#btnPerms').onclick = async () => { try { await PH.setup(); } catch {} refreshPhoneUi(); };
+  $('#btnNotif').onclick = () => { toast('Busque "Claudio" en la lista y actívelo.', 4000); PH.openNotificationAccess().catch(() => {}); };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshPhoneUi(); });
 }
 
 applyName();
