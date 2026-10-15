@@ -276,10 +276,10 @@ const DEF = {key:'', model:'claude-sonnet-5-5', aname:'Claudio', owner:'', name:
 let cfg = DEF;
 try { cfg = {...DEF, ...JSON.parse(localStorage.getItem('jarvis.cfg') || '{}')}; } catch {}
 let history = [];
-try { history = JSON.parse(localStorage.getItem('jarvis.hist') || '[]'); } catch {}
+try { history = JSON.parse(localStorage.getItem('claudio.hist.v2') || '[]'); localStorage.removeItem('jarvis.hist'); } catch {}
 
 const saveCfg = () => { try { localStorage.setItem('jarvis.cfg', JSON.stringify(cfg)); } catch {} };
-const saveHist = () => { try { localStorage.setItem('jarvis.hist', JSON.stringify(history.slice(-40))); } catch {} };
+const saveHist = () => { try { localStorage.setItem('claudio.hist.v2', JSON.stringify(history.slice(-40))); } catch {} };
 
 /* ---------- Estado e interfaz ---------- */
 const LABEL = {idle:'En línea', listening:'Escuchando', thinking:'Procesando', speaking:'Respondiendo', error:'Falla'};
@@ -712,15 +712,31 @@ Tus respuestas se escuchan en voz alta, así que:
 - Escribí números, horas y unidades de forma natural para ser leídos.
 - Empezá directo con la respuesta, sin repetir la pregunta.
 Si no sabés algo o necesitás información actual que no tenés, decilo con honestidad.
+Respondé solo lo que te piden en el último mensaje. No repitas información de turnos anteriores ni agregues datos que no te pidieron.
+Confiá en tus respuestas anteriores: si diste un dato, fue verificado en su momento. No te disculpes ni te corrijas por turnos pasados salvo que el usuario señale un error concreto.
 Fecha y hora actual: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '') + memoryBlock() + phoneBlock();
 }
 
 function buildMessages(){
   let h = history.slice(-20);
   while (h.length && h[0].role !== 'user') h = h.slice(1);
-  return h.map(m => m.role === 'user'
-    ? {role:'user', content: '[Habla: ' + (m.who || ownerLabel()) + '] ' + m.content}
-    : {role:'assistant', content: m.content || '…'});
+  const known = new Set([...TOOLS, ...PHONE_TOOLS].map(t => t.name));
+  const out = [];
+  h.forEach((m, idx) => {
+    if (m.role === 'user'){
+      const when = m.at ? ' · ' + new Date(m.at).toLocaleString('es-AR', {weekday:'short', day:'numeric', month:'numeric', hour:'2-digit', minute:'2-digit'}) : '';
+      out.push({role:'user', content: '[Habla: ' + (m.who || ownerLabel()) + when + '] ' + m.content});
+      return;
+    }
+    // Las consultas que Claudio hizo en ese turno se incluyen, así sabe que sus datos fueron verificados.
+    const tools = (m.tools || []).filter(t => known.has(t.name));
+    if (tools.length && idx >= h.length - 12){
+      out.push({role:'assistant', content: tools.map((t, k) => ({type:'tool_use', id:'h' + idx + '_' + k, name:t.name, input:t.input || {}}))});
+      out.push({role:'user', content: tools.map((t, k) => ({type:'tool_result', tool_use_id:'h' + idx + '_' + k, content: t.result || 'ok'}))});
+    }
+    out.push({role:'assistant', content: m.content || '…'});
+  });
+  return out;
 }
 
 async function callClaude(messages, onText){
@@ -802,7 +818,8 @@ async function ask(text){
   if (mem.speaker && Date.now() - mem.lastAt > 20 * 60e3){ mem.speaker = null; renderWho(); } // tras 20 min, vuelve a ser usted
   mem.lastAt = Date.now(); saveMem(); ask._retried = false; ask.turn++;
   capUser(text); capBot('');
-  const userMsg = {role:'user', content:text, who: speakerLabel()};
+  const userMsg = {role:'user', content:text, who: speakerLabel(), at: Date.now()};
+  const trace = [];
   history.push(userMsg);
   setState('thinking');
   streamDone = false;
@@ -827,13 +844,17 @@ async function ask(text){
       if (!uses.length) break;
       msgs.push({role:'assistant', content: r.blocks});
       const results = [];
-      for (const u of uses) results.push({type:'tool_result', tool_use_id: u.id, content: String(await runTool(u.name, u.input))});
+      for (const u of uses){
+        const res = String(await runTool(u.name, u.input));
+        results.push({type:'tool_result', tool_use_id: u.id, content: res});
+        trace.push({name: u.name, input: u.input || {}, result: res.length > 700 ? res.slice(0, 700) + '…' : res});
+      }
       msgs.push({role:'user', content: results});
       if (full && !/\s$/.test(full)){ full += ' '; buf += ' '; }
     }
     if (buf.trim() && !stopped) speak(buf);
     userMsg.who = userMsg.who === speakerLabel() ? userMsg.who : speakerLabel(); // si se presentó en este turno
-    history.push({role:'assistant', content: full.trim() || '…'});
+    history.push(trace.length ? {role:'assistant', content: full.trim() || '…', tools: trace} : {role:'assistant', content: full.trim() || '…'});
   } catch (e){
     if (e.name === 'AbortError'){
       if (full) history.push({role:'assistant', content: full}); else history.pop();
