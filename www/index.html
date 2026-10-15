@@ -342,7 +342,12 @@ function speak(text){
   const g = gen, v = pickVoice();
   let fired = false;
   const done = () => { if (fired) return; fired = true; clearTimeout(wd); if (g !== gen) return; pending--; checkDone(); };
-  const wd = setTimeout(done, 4000 + text.length * 110 / (cfg.rate || 1)); // por si el motor de voz no avisa
+  // Vigilante por si el motor de voz no avisa que terminó. Las frases se encolan, así que el
+  // plazo de cada una se cuenta desde que termina la anterior, no desde que entra en la cola.
+  const now = Date.now();
+  const est = text.length * 140 / (cfg.rate || 1);
+  speak.queueEnd = Math.max(speak.queueEnd || 0, now) + est;
+  const wd = setTimeout(done, speak.queueEnd - now + 6000);
   pending++; setState('speaking');
   if (NATIVE){
     const o = {text, lang: v ? v.lang : 'es-AR', rate: cfg.rate, pitch: cfg.pitch, volume: 1, queueStrategy: 1};
@@ -370,7 +375,7 @@ function stopAll(){
   if (abortCtrl) abortCtrl.abort();
   if (NATIVE) NTTS.stop().catch(() => {});
   else if (synth) synth.cancel();
-  pending = 0;
+  pending = 0; speak.queueEnd = 0;
 }
 // Corta el texto en oraciones completas para empezar a hablar mientras llega la respuesta.
 function flushSentences(buf){
