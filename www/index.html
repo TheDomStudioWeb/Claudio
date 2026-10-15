@@ -249,6 +249,14 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
   <h2>PERSONAS <button class="icon-btn" data-close aria-label="Cerrar">✕</button></h2>
   <p style="color:var(--muted);font-size:15px;margin:-6px 0 14px;line-height:1.4">Preséntele gente hablando ("te presento a Laura, mi esposa"). Quien le hable debe decir "hola, te habla …" para que sepa con quién conversa.</p>
   <div id="pplList"></div>
+  <div class="sec">MANUALES</div>
+  <p style="color:var(--muted);font-size:15px;margin:-4px 0 12px;line-height:1.4">Suba el manual de una app (PDF, TXT o MD). Claudio lo consulta cuando alguien pregunta cómo se usa, por ejemplo un vendedor nuevo con el hub comercial.</p>
+  <div id="manList"></div>
+  <div class="btns" style="margin:4px 0 8px">
+    <label class="btn ghost" style="display:grid;place-items:center">Subir manual
+      <input type="file" id="manFile" accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown" style="display:none">
+    </label>
+  </div>
   <div class="sec">DATOS GUARDADOS</div>
   <div id="factList"></div>
 </div></div>
@@ -497,6 +505,9 @@ const TOOLS = [
   {name:'recordar',
    description:'Guarda un dato duradero que el usuario te pide recordar o que le será útil en el futuro. Para datos de una persona puntual usá guardar_persona.',
    input_schema:{type:'object', properties:{dato:{type:'string'}}, required:['dato']}},
+  {name:'consultar_manual',
+   description:'Lee un manual cargado por el usuario (ver MANUALES CARGADOS) para explicar cómo funciona una app o un procedimiento.',
+   input_schema:{type:'object', properties:{nombre:{type:'string', description:'Título del manual'}}, required:['nombre']}},
   {name:'olvidar',
    description:'Borra lo que el usuario te pida olvidar: una persona completa, o un dato (de una persona o general).',
    input_schema:{type:'object', properties:{persona:{type:'string', description:'Nombre, si se olvida a una persona o un dato suyo'}, dato:{type:'string', description:'Texto aproximado del dato a borrar; vacío para borrar a la persona entera'}}}}
@@ -637,7 +648,82 @@ Podés manejar el teléfono del usuario con tus herramientas: agenda (Google Cal
 - Si falta un permiso o el teléfono está bloqueado, decilo con claridad.`;
 }
 
+/* ---------- Manuales (conocimiento cargado por el usuario) ---------- */
+let manuals = [];
+try { manuals = JSON.parse(localStorage.getItem('claudio.manuals') || '[]'); } catch {}
+const saveManuals = () => {
+  try { localStorage.setItem('claudio.manuals', JSON.stringify(manuals)); return true; }
+  catch { toast('No hay espacio para guardar más manuales. Borre alguno.'); return false; }
+};
+const MAX_MANUAL = 80000; // caracteres por manual
+
+function findManual(name){
+  const k = norm(name);
+  return manuals.find(m => norm(m.title) === k)
+      || manuals.find(m => norm(m.title).includes(k) || k.includes(norm(m.title)))
+      || (manuals.length === 1 ? manuals[0] : null);
+}
+
+async function pdfToText(file, title){
+  // El PDF se convierte una sola vez en texto, con la IA (sirve también para PDFs escaneados).
+  const b64 = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{'content-type':'application/json','x-api-key':cfg.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body: JSON.stringify({model:'claude-haiku-5-5', max_tokens:16000, messages:[{role:'user', content:[
+      {type:'document', source:{type:'base64', media_type:'application/pdf', data:b64}},
+      {type:'text', text:'Transcribí este manual ("' + title + '") a texto plano en español para que un asistente lo use al explicar la app. Conservá TODOS los pasos, opciones, nombres de pantallas y botones, estados y datos concretos, en el mismo orden y con títulos claros. Quitá solo el relleno. Describí brevemente lo que muestran las imágenes si aporta. Respondé únicamente con el texto del manual.'}
+    ]}]})
+  });
+  if (!res.ok){ let m = res.status + ''; try { m = (await res.json()).error.message; } catch {} throw new Error(m); }
+  const j = await res.json();
+  return {text: (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim(), cut: j.stop_reason === 'max_tokens'};
+}
+
+async function addManual(file){
+  if (!cfg.key){ toast('Primero configure su clave de API en Protocolos.'); return; }
+  const title = file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+  toast('Procesando "' + title + '"…', 60000);
+  try {
+    let text, cut = false;
+    if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf'){ ({text, cut} = await pdfToText(file, title)); }
+    else text = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsText(file); });
+    text = text.trim();
+    if (!text){ toast('El archivo no tiene texto.'); return; }
+    if (text.length > MAX_MANUAL){ text = text.slice(0, MAX_MANUAL); cut = true; }
+    manuals = manuals.filter(m => norm(m.title) !== norm(title));
+    manuals.push({id: Date.now(), title, text, added: Date.now(), cut});
+    if (saveManuals()) toast('Manual "' + title + '" cargado' + (cut ? ' (era muy largo: se guardó la primera parte).' : '.'), 4000);
+  } catch (e){ toast('No pude leer el manual: ' + ((e && e.message) || e), 6000); }
+  renderManuals();
+}
+
+function renderManuals(){
+  const el = $('#manList'); if (!el) return; el.innerHTML = '';
+  if (!manuals.length){ el.innerHTML = '<div class="empty" style="padding:10px 0">Sin manuales cargados.</div>'; return; }
+  for (const m of manuals){
+    const c = document.createElement('div'); c.className = 'pcard';
+    const h = document.createElement('h3'); const sp = document.createElement('span'); sp.textContent = m.title; h.appendChild(sp);
+    const del = document.createElement('button'); del.className = 'del'; del.textContent = 'Borrar';
+    del.onclick = () => { if (!confirm('¿Borrar el manual "' + m.title + '"?')) return; manuals = manuals.filter(x => x.id !== m.id); saveManuals(); renderManuals(); };
+    h.appendChild(del); c.appendChild(h);
+    const x = document.createElement('p'); x.textContent = Math.round(m.text.length / 1000) + ' mil caracteres · ' + new Date(m.added).toLocaleDateString('es-AR') + (m.cut ? ' · parcial' : ''); c.appendChild(x);
+    el.appendChild(c);
+  }
+}
+$('#manFile').onchange = e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) addManual(f); };
+
+function manualsBlock(){
+  if (!manuals.length) return '';
+  return `\n\nMANUALES CARGADOS: ${manuals.map(m => '"' + m.title + '"').join(', ')}.
+Si alguien pregunta cómo funciona una de esas apps o un procedimiento suyo, usá consultar_manual y explicá según el manual, paso a paso y en lenguaje simple, adaptado a quien te habla (por ejemplo, un vendedor nuevo). No inventes funciones que el manual no menciona; si no está, decilo.`;
+}
+
 function runTool(name, input){
+  if (name === 'consultar_manual'){
+    const m = findManual((input || {}).nombre || '');
+    return m ? 'Manual "' + m.title + '":\n' + m.text : 'No hay un manual con ese nombre. Manuales disponibles: ' + (manuals.map(x => x.title).join(', ') || 'ninguno') + '.';
+  }
   if (PH && PHONE_TOOLS.some(t => t.name === name)) return runPhoneTool(name, input);
   input = input || {};
   try {
@@ -714,7 +800,7 @@ Tus respuestas se escuchan en voz alta, así que:
 Si no sabés algo o necesitás información actual que no tenés, decilo con honestidad.
 Respondé solo lo que te piden en el último mensaje. No repitas información de turnos anteriores ni agregues datos que no te pidieron.
 Confiá en tus respuestas anteriores: si diste un dato, fue verificado en su momento. No te disculpes ni te corrijas por turnos pasados salvo que el usuario señale un error concreto.
-Fecha y hora actual: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '') + memoryBlock() + phoneBlock();
+Fecha y hora actual: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '') + memoryBlock() + manualsBlock() + phoneBlock();
 }
 
 function buildMessages(){
@@ -914,7 +1000,7 @@ $('#form').onsubmit = e => { e.preventDefault(); const t = $('#txt').value.trim(
 function openSheet(id){
   if (id === '#cfgSheet'){ fillCfg(); loadVoices(); refreshPhoneUi(); } // las voces de Android pueden cargar tarde
   if (id === '#logSheet') renderLog();
-  if (id === '#pplSheet') renderPeople();
+  if (id === '#pplSheet'){ renderPeople(); renderManuals(); }
   $(id).classList.add('open');
 }
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => b.closest('.sheet').classList.remove('open'));
