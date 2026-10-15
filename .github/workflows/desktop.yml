@@ -1,0 +1,79 @@
+name: Compilar Windows
+
+on:
+  push:
+    branches: [main]
+    paths: ['www/**', 'desktop/**', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Dependencias
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Copiar la app y el motor de voz
+        working-directory: desktop
+        run: |
+          rm -rf www
+          cp -r ../www www
+          rm -f www/sw.js
+          cp node_modules/vosk-browser/dist/vosk.js www/vosk.js
+
+      - name: Modelo de voz en español (caché)
+        id: vosk
+        uses: actions/cache@v4
+        with:
+          path: vosk-es.tar.gz
+          key: vosk-browser-small-es-0.42
+
+      - name: Descargar modelo si no está en caché
+        if: steps.vosk.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL -o model.zip https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip
+          mkdir -p m && unzip -q model.zip -d m
+          tar -czf vosk-es.tar.gz -C m vosk-model-small-es-0.42
+          ls -la vosk-es.tar.gz
+
+      - name: Incluir modelo
+        run: cp vosk-es.tar.gz desktop/www/vosk-es.tar.gz
+
+      - name: Compilar instalador
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --win nsis --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Claudio-Windows
+          path: desktop/dist/Claudio-Setup.exe
+
+      - name: Publicar en Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete windows --yes --cleanup-tag || true
+          gh release create windows desktop/dist/Claudio-Setup.exe \
+            --target "${{ github.sha }}" \
+            --title "Claudio para Windows" \
+            --notes "Instalador de Claudio para Windows (círculo flotante, atajo Ctrl+Mayús+Espacio, activación por voz). Compilado desde ${GITHUB_SHA::7}." \
+            --latest=false

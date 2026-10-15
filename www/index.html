@@ -114,6 +114,23 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
 .toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#071c2a;border:1px solid var(--warn);color:var(--warn);
   padding:10px 16px;border-radius:10px;font-size:15px;z-index:40;max-width:90vw;text-align:center;display:none}
 
+/* Escritorio (Windows): círculo flotante y panel */
+html.desk, html.desk body{background:transparent}
+html.desk body{border-radius:18px;overflow:hidden}
+html.desk.full body{background:radial-gradient(circle at 50% 38%,#0a2234 0%,var(--bg2) 35%,var(--bg) 75%);border:1px solid var(--dim)}
+html.desk header{-webkit-app-region:drag}
+html.desk header button, html.desk header .hdr-r{-webkit-app-region:no-drag}
+.desk-only{display:none}
+html.desk .desk-only{display:grid}
+html.desk.mini body{background:transparent;border:0;padding:0}
+html.desk.mini body::before, html.desk.mini .toast, html.desk.mini header, html.desk.mini .caption, html.desk.mini footer, html.desk.mini .who, html.desk.mini .boot{display:none!important}
+html.desk.mini main{padding:0;justify-content:center}
+html.desk.mini .hud-wrap{width:100vw;height:100vh;margin:0;-webkit-app-region:drag}
+html.desk.mini .core-hit{position:absolute;left:30%;top:30%;width:40%;height:40%;border-radius:50%;-webkit-app-region:no-drag;cursor:pointer}
+html.desk.mini .expand{position:absolute;right:4px;bottom:4px;width:30px;height:30px;border-radius:50%;border:1px solid var(--dim);background:rgba(2,7,13,.85);color:var(--c);display:grid;place-items:center;-webkit-app-region:no-drag;cursor:pointer;opacity:0;transition:opacity .2s}
+html.desk.mini .hud-wrap:hover .expand{opacity:1}
+.core-hit,.expand{display:none}
+html.desk.mini .core-hit, html.desk.mini .expand{display:grid}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes breathe{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.06);opacity:1}}
 @keyframes talk{from{transform:scale(.96)}to{transform:scale(1.1)}}
@@ -135,6 +152,7 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
     <div class="status"><i></i><span id="status">En línea</span></div>
   </div>
   <div class="hdr-r">
+    <button class="icon-btn desk-only" id="btnMini" aria-label="Reducir a círculo" title="Reducir a círculo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M4 4l4 4M20 4l-4 4M4 20l4-4M20 20l-4-4"/></svg></button>
     <button class="icon-btn" id="btnPpl" aria-label="Personas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.9.3 5 2.7 5 5.8"/></svg></button>
     <button class="icon-btn" id="btnLog" aria-label="Historial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
     <button class="icon-btn" id="btnCfg" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -156,6 +174,8 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
       <circle class="core" cx="150" cy="150" r="52"/>
       <text class="core-label" id="coreLabel" x="150" y="153" text-anchor="middle">CLAUDIO</text>
     </svg>
+    <div class="core-hit" id="coreHit" title="Hablar (Ctrl+Mayús+Espacio)"></div>
+    <button class="expand" id="btnExpand" title="Abrir panel" aria-label="Abrir panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg></button>
   </div>
   <div class="who" id="who" title="Tocar para volver a usted"></div>
 
@@ -279,6 +299,8 @@ const NSR = NATIVE ? CAP.registerPlugin('SpeechRecognition') : null;
 const NTTS = NATIVE ? CAP.registerPlugin('TextToSpeech') : null;
 const WK = NATIVE ? CAP.registerPlugin('WakeWord') : null;
 const PH = NATIVE ? CAP.registerPlugin('Phone') : null;
+const DESK = (!NATIVE && window.claudioDesktop) || null; // app de escritorio (Windows)
+if (DESK) document.documentElement.classList.add('desk', 'mini');
 let gen = 0; // se incrementa en cada interrupción para ignorar callbacks viejos
 const DEF = {key:'', model:'claude-sonnet-5-5', aname:'Claudio', owner:'', name:'señor', ctx:'', voice:'', rate:1.05, pitch:.9, converse:true, web:false, wake:false, pvKey:'', sens:.6};
 let cfg = DEF;
@@ -294,6 +316,7 @@ const LABEL = {idle:'En línea', listening:'Escuchando', thinking:'Procesando', 
 function setState(s){
   document.body.dataset.state = s; $('#status').textContent = LABEL[s] || s;
   clearTimeout(setState._r);
+  if (DESK) deskMode(s);
   if (s === 'idle' && WK && cfg.wake) setState._r = setTimeout(() => { if (document.body.dataset.state === 'idle' && !listening) WK.resume().catch(() => {}); }, 900);
 }
 const AN = () => cfg.aname || 'Claudio';
@@ -446,6 +469,7 @@ async function listenNative(opts = {}){
 
 function listen(opts){
   if (NATIVE) return listenNative(opts);
+  if (DESK) return listenDesk(opts);
   if (!SR){ toast('Este navegador no tiene reconocimiento de voz. Use Chrome o Edge, o escriba abajo.'); return; }
   if (listening) return;
   stopAll(); stopped = false;
@@ -785,6 +809,108 @@ Reglas de interlocutores:
   return t;
 }
 
+/* ---------- Escritorio: reconocimiento sin conexión (Vosk) ---------- */
+const vosk = {ready:false, loading:null, mode:'off', onDict:null, model:null, wakeRec:null, dictRec:null, ctx:null, key:''};
+const wakeKey = () => norm(AN()).split(/\s+/).pop();
+
+function loadScript(src){
+  return new Promise((res, rej) => { const el = document.createElement('script'); el.src = src; el.onload = res; el.onerror = () => rej(new Error('No se pudo cargar ' + src)); document.head.appendChild(el); });
+}
+function beep(){
+  try {
+    const ctx = vosk.ctx || new AudioContext(); const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.12);
+  } catch {}
+}
+function makeWakeRec(){
+  if (!vosk.model) return;
+  try { if (vosk.wakeRec) vosk.wakeRec.remove(); } catch {}
+  vosk.key = wakeKey();
+  vosk.wakeRec = new vosk.model.KaldiRecognizer(vosk.ctx.sampleRate, JSON.stringify([vosk.key, '[unk]']));
+  vosk.wakeRec.setWords(true);
+  vosk.wakeRec.on('result', m => {
+    if (vosk.mode !== 'wake') return;
+    const r = (m && m.result) || {}, words = r.result || [];
+    const minConf = Math.max(0.2, Math.min(0.95, 1.2 - (cfg.sens || 0.6)));
+    const hit = words.length ? words.some(w => w.word === vosk.key && (w.conf ?? 1) >= minConf) : String(r.text || '').split(/\s+/).includes(vosk.key);
+    if (hit) onDeskWake();
+  });
+}
+async function deskInit(){
+  if (vosk.ready) return true;
+  if (vosk.loading) return vosk.loading;
+  vosk.loading = (async () => {
+    try {
+      if (!window.Vosk) await loadScript('vosk.js');
+      const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, channelCount:1}});
+      vosk.ctx = new AudioContext();
+      if (vosk.ctx.state === 'suspended') await vosk.ctx.resume();
+      vosk.model = await Vosk.createModel(new URL('vosk-es.tar.gz', location.href).href);
+      vosk.dictRec = new vosk.model.KaldiRecognizer(vosk.ctx.sampleRate);
+      vosk.dictRec.on('partialresult', m => { if (vosk.mode === 'dict' && vosk.onDict) vosk.onDict('partial', (m.result && m.result.partial) || ''); });
+      vosk.dictRec.on('result', m => { if (vosk.mode === 'dict' && vosk.onDict) vosk.onDict('final', (m.result && m.result.text) || ''); });
+      makeWakeRec();
+      const src = vosk.ctx.createMediaStreamSource(stream);
+      const node = vosk.ctx.createScriptProcessor(4096, 1, 1);
+      node.onaudioprocess = e => {
+        try {
+          if (vosk.mode === 'wake' && vosk.wakeRec) vosk.wakeRec.acceptWaveform(e.inputBuffer);
+          else if (vosk.mode === 'dict' && vosk.dictRec) vosk.dictRec.acceptWaveform(e.inputBuffer);
+        } catch {}
+      };
+      src.connect(node); node.connect(vosk.ctx.destination); // la salida es silencio
+      vosk.ready = true;
+      deskMode(document.body.dataset.state);
+      return true;
+    } catch (e){
+      toast('No pude iniciar el micrófono: ' + ((e && e.message) || e) + '. Revise Configuración de Windows → Privacidad → Micrófono.', 7000);
+      vosk.loading = null;
+      return false;
+    }
+  })();
+  return vosk.loading;
+}
+function deskMode(state){
+  if (!DESK || !vosk.ready || listening) return;
+  clearTimeout(deskMode._t);
+  if (state === 'idle') deskMode._t = setTimeout(() => { if (!listening && document.body.dataset.state === 'idle') vosk.mode = cfg.wake ? 'wake' : 'off'; }, 700);
+  else vosk.mode = 'off'; // no escucharse a sí mismo mientras piensa o habla
+}
+function onDeskWake(){
+  vosk.mode = 'off';
+  if (listening || ['thinking', 'speaking'].includes(document.body.dataset.state)) return;
+  bootDone(false);
+  listen();
+}
+async function listenDesk(opts = {}){
+  if (listening) return;
+  listening = true;
+  stopAll(); stopped = false;
+  if (!(await deskInit())){ listening = false; setState('idle'); return; }
+  setState('listening'); capUser('Lo escucho…');
+  if (opts.beep !== false) beep();
+  let last = '', done = false, guard = null;
+  const arm = ms => { clearTimeout(guard); guard = setTimeout(() => finish(), ms); };
+  const finish = () => {
+    if (done) return; done = true; clearTimeout(guard);
+    vosk.onDict = null; vosk.mode = 'off'; finishListen = null; listening = false;
+    const t = last.trim();
+    if (t) ask(t); else { capUser(''); setState('idle'); }
+  };
+  finishListen = () => { try { vosk.dictRec.retrieveFinalResult(); } catch {} arm(900); };
+  vosk.onDict = (type, text) => {
+    if (type === 'partial'){ if (text){ last = text; capUser(text); arm(4000); } }
+    else if (text){ last = text; finish(); }
+    else if (last) finish();
+  };
+  vosk.mode = 'dict';
+  arm(9000);
+}
+function deskSetMode(mode){
+  document.documentElement.classList.toggle('mini', mode === 'mini');
+  document.documentElement.classList.toggle('full', mode !== 'mini');
+}
+
 /* ---------- Cerebro ---------- */
 function systemPrompt(){
   const now = new Date().toLocaleString('es-AR', {dateStyle:'full', timeStyle:'short'});
@@ -988,7 +1114,7 @@ function renderPeople(){
 
 /* ---------- Controles ---------- */
 function micAction(){
-  if (listening){ if (NATIVE){ if (finishListen) finishListen(); } else if (rec) rec.stop(); return; }
+  if (listening){ if (NATIVE || DESK){ if (finishListen) finishListen(); } else if (rec) rec.stop(); return; }
   const s = document.body.dataset.state;
   if (s === 'speaking' || s === 'thinking'){ stopAll(); setState('idle'); return; }
   listen();
@@ -1023,7 +1149,7 @@ function updRanges(){ $('#vSens').textContent = (+$('#cSens').value).toFixed(2);
 $('#cRate').oninput = $('#cPitch').oninput = $('#cSens').oninput = updRanges;
 $('#testVoice').onclick = () => { readCfg(); stopAll(); speak('A su servicio, ' + cfg.name + '. Todos los sistemas operativos.'); };
 $('#clearHist').onclick = () => { history = []; saveHist(); toast('Memoria de conversación borrada.'); };
-$('#saveCfg').onclick = async () => { readCfg(); saveCfg(); applyName(); $('#cfgSheet').classList.remove('open'); toast('Protocolos actualizados.', 2000); await syncWake(true); };
+$('#saveCfg').onclick = async () => { readCfg(); saveCfg(); applyName(); $('#cfgSheet').classList.remove('open'); toast('Protocolos actualizados.', 2000); if (DESK && vosk.ready){ if (wakeKey() !== vosk.key) makeWakeRec(); deskMode(document.body.dataset.state); } await syncWake(true); };
 
 /* ---------- Arranque ---------- */
 const BOOT = ['> Inicializando núcleo de IA…', '> Calibrando sintetizador de voz…', '> Enlazando reconocimiento de voz…', '> Cargando protocolos personales…', '> Todos los sistemas en línea.'];
@@ -1068,6 +1194,17 @@ async function syncWake(verbose){
     toast('Activación por voz: ' + ((e && e.message) || e), 5000);
   }
 }
+if (DESK){
+  $('#wakeBox').style.display = 'block';
+  $('#btnOverlay').parentElement.style.display = 'none';
+  $('#overlayState').style.display = 'none';
+  $('#wakeHint').textContent = 'Diga el nombre y empieza a escuchar, con Claudio flotando sobre cualquier ventana. Funciona sin internet. Atajo: Ctrl + Mayús + Espacio.';
+  $('#coreHit').onclick = e => { e.stopPropagation(); micAction(); };
+  $('#btnExpand').onclick = e => { e.stopPropagation(); DESK.setMode('full'); };
+  $('#btnMini').onclick = () => DESK.setMode('mini');
+  DESK.onMode(deskSetMode);
+  DESK.onHotkey(() => { bootDone(false); micAction(); });
+}
 if (WK){
   $('#wakeBox').style.display = 'block';
   $('#btnOverlay').onclick = () => WK.openOverlaySettings().catch(() => {});
@@ -1097,6 +1234,10 @@ if (PH){
 
 applyName();
 renderWho();
+if (DESK){
+  bootDone(false);
+  deskInit().then(ok => { if (ok && cfg.wake) toast('Diga "' + AN() + '" para hablarle.', 2500); });
+}
 if (NATIVE){
   // En la app no hace falta tocar para iniciar: Android no exige un gesto para hablar.
   setTimeout(() => bootDone(false), 2200);
@@ -1106,7 +1247,7 @@ if (NATIVE){
   })();
 }
 
-if (!NATIVE && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if (!NATIVE && !DESK && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
 </html>
