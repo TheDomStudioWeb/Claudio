@@ -119,7 +119,7 @@ html.desk, html.desk body{background:transparent}
 html.desk body{border-radius:18px;overflow:hidden}
 html.desk.full body{background:radial-gradient(circle at 50% 38%,#0a2234 0%,var(--bg2) 35%,var(--bg) 75%);border:1px solid var(--dim)}
 html.desk header{-webkit-app-region:drag}
-html.desk header button, html.desk header .hdr-r{-webkit-app-region:no-drag}
+html.desk header button, html.desk header .hdr-r, html.desk .sheet, html.desk .toast, html.desk footer, html.desk .caption{-webkit-app-region:no-drag}
 .desk-only{display:none}
 html.desk .desk-only{display:grid}
 html.desk.mini body{background:transparent;border:0;padding:0}
@@ -907,6 +907,7 @@ async function listenDesk(opts = {}){
   arm(9000);
 }
 function deskSetMode(mode){
+  if (mode === 'mini') document.querySelectorAll('.sheet.open').forEach(el => el.classList.remove('open'));
   document.documentElement.classList.toggle('mini', mode === 'mini');
   document.documentElement.classList.toggle('full', mode !== 'mini');
 }
@@ -1124,6 +1125,8 @@ $('#hud').onclick = micAction;
 $('#form').onsubmit = e => { e.preventDefault(); const t = $('#txt').value.trim(); if (!t) return; $('#txt').value = ''; $('#txt').blur(); ask(t); };
 
 function openSheet(id){
+  // En Windows, los paneles siempre se abren con la ventana grande (en el círculo no entran ni se pueden usar).
+  if (DESK && document.documentElement.classList.contains('mini')){ deskSetMode('full'); DESK.setMode('full'); }
   if (id === '#cfgSheet'){ fillCfg(); loadVoices(); refreshPhoneUi(); } // las voces de Android pueden cargar tarde
   if (id === '#logSheet') renderLog();
   if (id === '#pplSheet'){ renderPeople(); renderManuals(); }
