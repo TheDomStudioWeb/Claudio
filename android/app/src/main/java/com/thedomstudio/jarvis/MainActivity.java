@@ -13,6 +13,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(WakeWordPlugin.class);
         registerPlugin(PhonePlugin.class);
+        registerPlugin(ReunionPlugin.class);
         super.onCreate(savedInstanceState);
         // Permite que la app aparezca sobre la pantalla de bloqueo al ser llamada por voz.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {

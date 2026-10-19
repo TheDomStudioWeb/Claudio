@@ -2,14 +2,14 @@ name: Compilar APK
 
 on:
   push:
-    branches: [main]
+    branches: [main, modo-reunion]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: apk
+  group: apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -66,9 +66,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete apk --yes --cleanup-tag || true
-          gh release create apk Claudio.apk \
-            --target "${{ github.sha }}" \
-            --title "Claudio — última versión" \
-            --notes "APK compilada automáticamente desde ${GITHUB_SHA::7}. Descargala desde el teléfono e instalala." \
-            --latest
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            gh release delete apk --yes --cleanup-tag || true
+            gh release create apk Claudio.apk \
+              --target "${{ github.sha }}" \
+              --title "Claudio — última versión" \
+              --notes "APK compilada automáticamente desde ${GITHUB_SHA::7}. Descargala desde el teléfono e instalala." \
+              --latest
+          else
+            gh release delete apk-prueba --yes --cleanup-tag || true
+            gh release create apk-prueba Claudio.apk \
+              --target "${{ github.sha }}" \
+              --title "Claudio — versión de prueba (${GITHUB_REF_NAME})" \
+              --notes "APK de prueba compilada desde la rama ${GITHUB_REF_NAME} (${GITHUB_SHA::7}). La versión estable sigue en 'Claudio — última versión'." \
+              --prerelease
+          fi

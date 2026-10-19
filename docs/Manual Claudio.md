@@ -78,6 +78,10 @@ Para que la escucha del nombre no se duerma: Ajustes → Apps → Claudio → Ba
 - El reconocimiento de voz funciona **sin internet** con un modelo en español incorporado; la IA sí necesita conexión.
 - Instalación: Windows puede mostrar "Windows protegió su PC" porque la app no tiene firma comercial: tocar **Más información → Ejecutar de todas formas**. Si no escucha, revisar Configuración → Privacidad → Micrófono → permitir apps de escritorio.
 
+## Modo reunión (solo teléfono Android)
+
+Graba una reunión en segundo plano, solo audio, en archivos de unos 25 minutos guardados en Música > Claudio Reuniones, para transcribirlos después con Gemini. Se inicia diciendo "Claudio, empezá la reunión" o con el botón del círculo con punto. Mientras graba, Claudio no escucha ni habla; se termina desde la notificación, la barra roja o el panel. No graba llamadas ni videollamadas. Ver el manual aparte "Manual Modo Reunion".
+
 ## Mensajes de error frecuentes
 
 - **Se agotó el crédito:** cargar saldo en la consola de Anthropic (Billing).

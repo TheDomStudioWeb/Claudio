@@ -26,6 +26,12 @@ Solo en la app Android. Escucha el nombre del asistente sin conexión con [Vosk]
 Mientras está atento, Android muestra una notificación fija. Al detectar el nombre suena un tono y empieza a escucharte.
 El modelo se descarga en la compilación (GitHub Actions); no está versionado en el repo.
 
+## Modo reunión (solo Android)
+Graba el audio de una reunión en segundo plano (micrófono o audio del teléfono), sin video, en archivos M4A de 25 minutos
+guardados en **Música / Claudio Reuniones**. Mientras graba, Claudio no escucha ni habla. Se inicia diciendo
+"Claudio, empezá la reunión" o desde el botón del círculo (arriba a la derecha). Los audios se comparten con Gemini para transcribirlos
+con hablantes. Detalles en [docs/Manual Modo Reunion.md](docs/Manual%20Modo%20Reunion.md).
+
 ## Estructura
 | Carpeta | Qué es |
 |---|---|

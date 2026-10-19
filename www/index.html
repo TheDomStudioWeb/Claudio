@@ -100,6 +100,17 @@ input[type=checkbox]{width:22px;height:22px;accent-color:var(--c)}
 .btns{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
 .btn{flex:1;min-width:130px;height:46px;border-radius:12px;border:1px solid var(--c);background:rgba(62,230,255,.12);color:var(--c);font:600 15px Rajdhani;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
 .btn.ghost{border-color:var(--dim);color:var(--muted);background:none}
+.btn.rec{border-color:var(--err);color:var(--err);background:rgba(255,77,94,.12)}
+.reu-banner{position:fixed;left:12px;right:12px;top:calc(max(env(safe-area-inset-top),var(--safe-area-inset-top,0px)) + 8px);z-index:25;display:none;align-items:center;gap:10px;
+  background:#2a0b10;border:1px solid var(--err);border-radius:12px;padding:8px 12px;color:#ffd5d9;font:600 15px Rajdhani;letter-spacing:.06em}
+.reu-banner.on{display:flex}
+.reu-banner i{width:10px;height:10px;border-radius:50%;background:var(--err);animation:blink 1.2s infinite;flex:none}
+.reu-banner span{flex:1}
+.reu-banner button{height:34px;border-radius:9px;border:1px solid var(--err);background:none;color:var(--err);font:700 13px Rajdhani;letter-spacing:.1em;padding:0 12px;text-transform:uppercase}
+.reu-lvl{height:8px;border-radius:5px;background:#061926;border:1px solid var(--dim);overflow:hidden;margin:6px 0 4px}
+.reu-lvl b{display:block;height:100%;width:0;background:var(--c);transition:width .25s}
+.reu-part{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid #0d2a38;font-size:15px}
+.reu-part small{color:var(--muted)}
 .log{display:flex;flex-direction:column;gap:10px}
 .bub{padding:10px 13px;border-radius:12px;font-size:16px;line-height:1.35;max-width:88%;white-space:pre-wrap}
 .bub.user{align-self:flex-end;background:#0b2a3c;color:var(--txt)}
@@ -153,6 +164,7 @@ html.desk.mini .core-hit, html.desk.mini .expand{display:grid}
   </div>
   <div class="hdr-r">
     <button class="icon-btn desk-only" id="btnMini" aria-label="Reducir a círculo" title="Reducir a círculo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M4 4l4 4M20 4l-4 4M4 20l4-4M20 20l-4-4"/></svg></button>
+    <button class="icon-btn" id="btnReu" aria-label="Modo reunión" title="Modo reunión" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></svg></button>
     <button class="icon-btn" id="btnPpl" aria-label="Personas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.9.3 5 2.7 5 5.8"/></svg></button>
     <button class="icon-btn" id="btnLog" aria-label="Historial"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
     <button class="icon-btn" id="btnCfg" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -194,6 +206,34 @@ html.desk.mini .core-hit, html.desk.mini .expand{display:grid}
     <svg id="micIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
   </button>
 </footer>
+
+<!-- Modo reunión (solo APK) -->
+<div class="reu-banner" id="reuBanner"><i></i><span id="reuBanTxt">Grabando reunión</span><button id="reuBanStop">Terminar</button></div>
+<div class="sheet" id="reuSheet"><div class="panel">
+  <h2>MODO REUNIÓN <button class="icon-btn" data-close aria-label="Cerrar">✕</button></h2>
+  <p style="color:var(--muted);font-size:15px;margin:-4px 0 14px;line-height:1.4">Graba solo el audio, en segundo plano y con la pantalla apagada. Guarda archivos de audio separados, de unos 25 minutos cada uno, en <b>Música / Claudio Reuniones</b>. Mientras graba, Claudio no escucha ni habla.</p>
+  <div id="reuIdle">
+    <div class="field"><label>Qué grabar</label>
+      <select id="reuFuente">
+        <option value="mic">Micrófono (reunión presencial)</option>
+        <option value="sistema">Audio del teléfono (lo que suena en el equipo)</option>
+      </select>
+      <small id="reuFuenteHint">El micrófono toma las voces del ambiente. Con el teléfono sobre la mesa, cerca de todos.</small></div>
+    <div class="field"><label>Cortar cada (minutos)</label><input type="text" inputmode="numeric" id="reuChunk" placeholder="25"></div>
+    <div class="btns"><button class="btn" id="reuStart">Empezar a grabar</button></div>
+  </div>
+  <div id="reuRun" style="display:none">
+    <div style="font:700 30px Orbitron;color:var(--err);letter-spacing:.1em;text-align:center;margin:6px 0" id="reuTime">00:00</div>
+    <div style="text-align:center;color:var(--muted);font-size:15px" id="reuInfo"></div>
+    <div class="reu-lvl"><b id="reuLvl"></b></div>
+    <small id="reuLvlTxt" style="display:block;color:var(--muted);font-size:13px">Si la barra no se mueve, no está entrando audio.</small>
+    <div class="btns"><button class="btn rec" id="reuStop">Terminar reunión</button></div>
+  </div>
+  <div class="sec">ÚLTIMA REUNIÓN</div>
+  <div id="reuParts"><div class="empty" style="padding:12px 0">Todavía no hay grabaciones.</div></div>
+  <div class="btns"><button class="btn ghost" id="reuShare">Compartir audios</button></div>
+  <small style="display:block;color:var(--muted);font-size:13px;margin-top:10px;line-height:1.4">Compartí los audios con Gemini (u otra IA) para transcribirlos con hablantes. Al terminar, el teléfono vuelve a escuchar su nombre. Avisá a las personas que se las está grabando.</small>
+</div></div>
 
 <!-- Ajustes -->
 <div class="sheet" id="cfgSheet"><div class="panel">
@@ -299,6 +339,9 @@ const NSR = NATIVE ? CAP.registerPlugin('SpeechRecognition') : null;
 const NTTS = NATIVE ? CAP.registerPlugin('TextToSpeech') : null;
 const WK = NATIVE ? CAP.registerPlugin('WakeWord') : null;
 const PH = NATIVE ? CAP.registerPlugin('Phone') : null;
+const RU = NATIVE ? CAP.registerPlugin('Reunion') : null;
+let reunionOn = false;        // mientras graba una reunión, Claudio no escucha ni habla
+let pendingReunion = null;    // reunión pedida por voz: arranca cuando Claudio termina de responder
 const DESK = (!NATIVE && window.claudioDesktop) || null; // app de escritorio (Windows)
 if (DESK) document.documentElement.classList.add('desk', 'mini');
 let gen = 0; // se incrementa en cada interrupción para ignorar callbacks viejos
@@ -317,7 +360,7 @@ function setState(s){
   document.body.dataset.state = s; $('#status').textContent = LABEL[s] || s;
   clearTimeout(setState._r);
   if (DESK) deskMode(s);
-  if (s === 'idle' && WK && cfg.wake) setState._r = setTimeout(() => { if (document.body.dataset.state === 'idle' && !listening) WK.resume().catch(() => {}); }, 900);
+  if (s === 'idle' && WK && cfg.wake && !reunionOn) setState._r = setTimeout(() => { if (document.body.dataset.state === 'idle' && !listening && !reunionOn) WK.resume().catch(() => {}); }, 900);
 }
 const AN = () => cfg.aname || 'Claudio';
 function applyName(){
@@ -369,6 +412,7 @@ function clean(t){
 }
 function speak(text){
   text = clean(text);
+  if (reunionOn) return;
   if (!text || (!NATIVE && !synth)) return;
   const g = gen, v = pickVoice();
   let fired = false;
@@ -396,6 +440,7 @@ function checkDone(){
   if (pending > 0 || !streamDone) return;
   pending = 0;
   if (document.body.dataset.state !== 'error') setState('idle');
+  if (pendingReunion){ const f = pendingReunion; pendingReunion = null; stopped = true; setTimeout(() => iniciarReunion(f), 300); return; }
   if (cfg.converse && !stopped){
     clearTimeout(setState._r); // la conversación sigue: no reactivar la escucha del nombre
     setTimeout(() => { if (!stopped && document.body.dataset.state === 'idle') listen(); }, 800);
@@ -468,6 +513,7 @@ async function listenNative(opts = {}){
 }
 
 function listen(opts){
+  if (reunionOn){ toast('Modo reunión: Claudio no escucha hasta que termine la grabación.', 3500); return; }
   if (NATIVE) return listenNative(opts);
   if (DESK) return listenDesk(opts);
   if (!SR){ toast('Este navegador no tiene reconocimiento de voz. Use Chrome o Edge, o escriba abajo.'); return; }
@@ -672,6 +718,34 @@ Podés manejar el teléfono del usuario con tus herramientas: agenda (Google Cal
 - Si falta un permiso o el teléfono está bloqueado, decilo con claridad.`;
 }
 
+/* ---------- Modo reunión (solo APK) ---------- */
+const REUNION_TOOLS = !RU ? [] : [
+  {name:'iniciar_reunion', description:'Empieza a grabar una reunión (solo audio, en segundo plano, en archivos de unos 25 minutos) y pasa a modo reunión: dejás de escuchar y de hablar hasta que el usuario termine la grabación desde la notificación o el botón rojo de la app. Usala cuando diga "empezá la reunión", "grabá la reunión", "modo reunión", etc. fuente: "mic" (micrófono, por defecto, para reuniones presenciales) o "sistema" (el audio que suena en el teléfono).',
+   input_schema:{type:'object', properties:{fuente:{type:'string', enum:['mic','sistema']}}}},
+  {name:'terminar_reunion', description:'Termina la grabación de la reunión en curso y guarda los audios.', input_schema:{type:'object', properties:{}}}
+];
+function reunionBlock(){
+  if (!RU) return '';
+  return `\n\nMODO REUNIÓN
+Podés grabar reuniones del usuario con iniciar_reunion (solo audio, en segundo plano). Al empezar, confirmale en una sola frase que grabás y que no vas a escuchar ni hablar hasta que termine la grabación (desde la notificación o el botón rojo). Los audios quedan en Música > Claudio Reuniones, en partes de unos 25 minutos, y el usuario los pasa a Gemini para transcribirlos con hablantes. Si el usuario pide grabar el audio del teléfono, usá fuente "sistema" y avisale que Android va a pedir confirmar y que no se graba video. No grabes si no te lo pidió.`;
+}
+async function runReunionTool(name, i){
+  i = i || {};
+  try {
+    if (name === 'iniciar_reunion'){
+      if (reunionOn) return 'Ya hay una reunión en curso.';
+      pendingReunion = i.fuente === 'sistema' ? 'sistema' : 'mic';
+      return 'Listo: la grabación arranca apenas termines de responder. Confirmale en una frase corta que empieza a grabar y que no vas a escuchar ni hablar hasta que termine la reunión' + (pendingReunion === 'sistema' ? ' (Android va a pedirle una confirmación en pantalla para capturar el audio; no se graba video)' : '') + '.';
+    }
+    if (name === 'terminar_reunion'){
+      if (!reunionOn) return 'No hay ninguna reunión en curso.';
+      await terminarReunion();
+      return 'Reunión terminada y guardada. Decile en una frase que los audios están en Música > Claudio Reuniones y que puede compartirlos desde el panel de reunión.';
+    }
+  } catch (e){ return errMsg(e); }
+  return null;
+}
+
 /* ---------- Manuales (conocimiento cargado por el usuario) ---------- */
 let manuals = [];
 try { manuals = JSON.parse(localStorage.getItem('claudio.manuals') || '[]'); } catch {}
@@ -749,6 +823,7 @@ function runTool(name, input){
     return m ? 'Manual "' + m.title + '":\n' + m.text : 'No hay un manual con ese nombre. Manuales disponibles: ' + (manuals.map(x => x.title).join(', ') || 'ninguno') + '.';
   }
   if (PH && PHONE_TOOLS.some(t => t.name === name)) return runPhoneTool(name, input);
+  if (RU && REUNION_TOOLS.some(t => t.name === name)) return runReunionTool(name, input);
   input = input || {};
   try {
     if (name === 'establecer_interlocutor'){
@@ -927,13 +1002,13 @@ Tus respuestas se escuchan en voz alta, así que:
 Si no sabés algo o necesitás información actual que no tenés, decilo con honestidad.
 Respondé solo lo que te piden en el último mensaje. No repitas información de turnos anteriores ni agregues datos que no te pidieron.
 Confiá en tus respuestas anteriores: si diste un dato, fue verificado en su momento. No te disculpes ni te corrijas por turnos pasados salvo que el usuario señale un error concreto.
-Fecha y hora actual: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '') + memoryBlock() + manualsBlock() + phoneBlock();
+Fecha y hora actual: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '') + memoryBlock() + manualsBlock() + phoneBlock() + reunionBlock();
 }
 
 function buildMessages(){
   let h = history.slice(-20);
   while (h.length && h[0].role !== 'user') h = h.slice(1);
-  const known = new Set([...TOOLS, ...PHONE_TOOLS].map(t => t.name));
+  const known = new Set([...TOOLS, ...PHONE_TOOLS, ...REUNION_TOOLS].map(t => t.name));
   const out = [];
   h.forEach((m, idx) => {
     if (m.role === 'user'){
@@ -953,7 +1028,7 @@ function buildMessages(){
 }
 
 async function callClaude(messages, onText){
-  const tools = [...TOOLS, ...PHONE_TOOLS];
+  const tools = [...TOOLS, ...PHONE_TOOLS, ...REUNION_TOOLS];
   if (cfg.web) tools.push({type:'web_search_20250305', name:'web_search', max_uses:3});
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST', signal: abortCtrl.signal,
@@ -1212,6 +1287,7 @@ if (WK){
   $('#wakeBox').style.display = 'block';
   $('#btnOverlay').onclick = () => WK.openOverlaySettings().catch(() => {});
   WK.addListener('wake', () => {
+    if (reunionOn) return;
     bootDone(false);
     if (listening || ['thinking', 'speaking'].includes(document.body.dataset.state)) return;
     listen({beep: false}); // el servicio ya hizo sonar el tono
@@ -1233,6 +1309,106 @@ if (PH){
   $('#btnPerms').onclick = async () => { try { await PH.setup(); } catch {} refreshPhoneUi(); };
   $('#btnNotif').onclick = () => { toast('Busque "Claudio" en la lista y actívelo.', 4000); PH.openNotificationAccess().catch(() => {}); };
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshPhoneUi(); });
+}
+
+/* ---------- Modo reunión: pantalla y control ---------- */
+const reuLS = (() => { try { return JSON.parse(localStorage.getItem('claudio.reu') || '{}'); } catch { return {}; } })();
+const fmtT = ms => { const t = Math.max(0, Math.floor(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), x = t % 60;
+  return (h ? String(h).padStart(2, '0') + ':' : '') + String(m).padStart(2, '0') + ':' + String(x).padStart(2, '0'); };
+let reuPoll = null, reuStart = 0;
+
+function reuPaint(st){
+  const on = !!(st && st.activa);
+  $('#reuIdle').style.display = on ? 'none' : 'block';
+  $('#reuRun').style.display = on ? 'block' : 'none';
+  $('#reuBanner').classList.toggle('on', on);
+  if (on){
+    reuStart = st.inicioMs || reuStart || Date.now();
+    const t = fmtT(Date.now() - reuStart);
+    $('#reuTime').textContent = t;
+    $('#reuBanTxt').textContent = 'Grabando reunión · ' + t;
+    $('#reuInfo').textContent = (st.fuente === 'sistema' ? 'Audio del teléfono' : 'Micrófono') + ' · parte ' + Math.max(1, st.parte || 1);
+    $('#reuLvl').style.width = Math.min(100, st.nivel || 0) + '%';
+  }
+  const ps = (st && st.partes) || [];
+  $('#reuParts').innerHTML = ps.length ? '' : '<div class="empty" style="padding:12px 0">Todavía no hay grabaciones.</div>';
+  ps.forEach(x => {
+    const d = document.createElement('div'); d.className = 'reu-part';
+    d.innerHTML = '<span></span><small></small>'; d.firstChild.textContent = x.nombre; d.lastChild.textContent = fmtT((x.seg || 0) * 1000);
+    $('#reuParts').appendChild(d);
+  });
+}
+async function reuRefresh(){
+  if (!RU) return null;
+  try {
+    const st = await RU.estado();
+    if (st.activa && !reunionOn){ reunionOn = true; clearTimeout(setState._r); try { stopAll(); } catch {} }
+    if (!st.activa && reunionOn && Date.now() - reuStart > 4000) reuEnded();
+    reuPaint(st);
+    return st;
+  } catch { return null; }
+}
+function reuEnded(){
+  reunionOn = false;
+  stopped = true;
+  if (reuPoll){ clearInterval(reuPoll); reuPoll = null; }
+}
+function reuStartPoll(){ if (!reuPoll) reuPoll = setInterval(reuRefresh, 1000); }
+
+async function iniciarReunion(fuente){
+  if (!RU) return;
+  fuente = fuente === 'sistema' ? 'sistema' : 'mic';
+  const chunk = Math.max(5, Math.min(60, parseInt($('#reuChunk').value, 10) || reuLS.chunk || 25));
+  try { localStorage.setItem('claudio.reu', JSON.stringify({fuente, chunk})); } catch {}
+  try {
+    stopAll(); stopped = true; listening = false;
+    try { await WK.cancelListen(); } catch {}
+    try { await WK.pause(); } catch {}
+    await RU.iniciar({fuente, chunkMin: chunk});
+    reunionOn = true;
+    reuStart = Date.now();
+    setState('idle');
+    capBot('Modo reunión activo. Grabando ' + (fuente === 'sistema' ? 'el audio del teléfono' : 'por micrófono') + '. No escucho ni hablo hasta que termine.');
+    reuStartPoll(); reuRefresh();
+  } catch (e){
+    reunionOn = false;
+    try { WK.resume(); } catch {}
+    toast('No pude iniciar la reunión: ' + ((e && e.message) || e), 5000);
+  }
+}
+async function terminarReunion(){
+  if (!RU) return;
+  try { await RU.terminar(); } catch (e){ toast('No pude terminar: ' + ((e && e.message) || e), 4000); }
+  setTimeout(reuRefresh, 600);
+}
+
+if (RU){
+  $('#btnReu').style.display = '';
+  $('#btnReu').onclick = () => { $('#reuChunk').value = reuLS.chunk || 25; if (reuLS.fuente) $('#reuFuente').value = reuLS.fuente; reuRefresh(); openSheet('#reuSheet'); reuStartPoll(); };
+  $('#reuStart').onclick = () => { $('#reuSheet').classList.remove('open'); iniciarReunion($('#reuFuente').value); };
+  $('#reuStop').onclick = terminarReunion;
+  $('#reuBanStop').onclick = terminarReunion;
+  $('#reuBanner').onclick = e => { if (e.target.id !== 'reuBanStop'){ reuRefresh(); openSheet('#reuSheet'); } };
+  $('#reuShare').onclick = () => RU.compartir().catch(e => toast((e && e.message) || 'No hay audios para compartir.', 3500));
+  $('#reuFuente').onchange = () => {
+    $('#reuFuenteHint').textContent = $('#reuFuente').value === 'sistema'
+      ? 'Graba lo que suena en el teléfono (por ejemplo, una nota de voz o un video que reproduzca). Android va a pedir confirmar "compartir pantalla": no se graba video. No captura llamadas ni videollamadas.'
+      : 'El micrófono toma las voces del ambiente. Con el teléfono sobre la mesa, cerca de todos.';
+  };
+  RU.addListener('reunion', ev => {
+    if (!ev) return;
+    if (ev.tipo === 'parte') toast('Guardada la parte ' + ev.num + ' de la reunión.', 2500);
+    else if (ev.tipo === 'error') toast('Reunión: ' + ev.texto, 6000);
+    else if (ev.tipo === 'fin'){
+      reuEnded();
+      reuRefresh();
+      capBot('Reunión guardada: ' + ev.texto + ' en Música > Claudio Reuniones. Podés compartirlos desde el botón de reunión.');
+      if (!document.hidden) speak('Reunión guardada.');
+      if (WK && cfg.wake) setTimeout(() => WK.resume().catch(() => {}), 1200);
+    }
+  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) reuRefresh(); });
+  reuRefresh().then(st => { if (st && st.activa) reuStartPoll(); });
 }
 
 applyName();

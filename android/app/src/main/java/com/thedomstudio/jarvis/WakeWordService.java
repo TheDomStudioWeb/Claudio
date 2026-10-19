@@ -48,6 +48,8 @@ public class WakeWordService extends Service implements RecognitionListener {
     private static final float SAMPLE_RATE = 16000f;
 
     static volatile WakeWordService instance;
+    /** Modo reunión: mientras sea verdadero, el micrófono queda libre y Claudio no escucha su nombre. */
+    static volatile boolean reunion = false;
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
@@ -168,7 +170,7 @@ public class WakeWordService extends Service implements RecognitionListener {
     }
 
     private void startListening() {
-        if (recognizer == null || speech != null) return;
+        if (reunion || recognizer == null || speech != null) return;
         try {
             recognizer.reset();
             speech = new SpeechService(recognizer, SAMPLE_RATE);
@@ -200,6 +202,7 @@ public class WakeWordService extends Service implements RecognitionListener {
 
     void resumeDetection() {
         main.post(() -> {
+            if (reunion) return;
             main.removeCallbacks(autoResume);
             paused = false;
             startListening();
@@ -210,6 +213,7 @@ public class WakeWordService extends Service implements RecognitionListener {
     /** Reanuda tras una pausa breve (por ejemplo, cuando el usuario sale de la app). */
     void resumeSoon(long delayMs) {
         main.post(() -> {
+            if (reunion) return;
             main.removeCallbacks(autoResume);
             main.postDelayed(autoResume, delayMs);
         });
@@ -302,8 +306,8 @@ public class WakeWordService extends Service implements RecognitionListener {
         PendingIntent pi = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         return new NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-            .setContentTitle(paused ? name + " está conversando" : name + " está atento")
-            .setContentText(paused ? "Vuelve a escuchar su nombre al terminar" : "Diga \"" + name + "\" para hablarle")
+            .setContentTitle(reunion ? name + " en modo reunión" : paused ? name + " está conversando" : name + " está atento")
+            .setContentText(reunion ? "No escucha hasta que termine la grabación" : paused ? "Vuelve a escuchar su nombre al terminar" : "Diga \"" + name + "\" para hablarle")
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pi)
