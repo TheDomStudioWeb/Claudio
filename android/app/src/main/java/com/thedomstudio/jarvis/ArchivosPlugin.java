@@ -133,7 +133,7 @@ public class ArchivosPlugin extends Plugin {
                 if (!r.equals(base) && r.length() > 0) { base = r; cambio = true; }
             }
         }
-        return base.trim() + ext;
+        return base.replaceAll("[_\\-\\s]+", " ").trim() + ext;
     }
 
     private File raiz() { return Environment.getExternalStorageDirectory(); }
