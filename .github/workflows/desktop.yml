@@ -2,7 +2,7 @@ name: Compilar Windows
 
 on:
   push:
-    branches: [main]
+    branches: [main, windows-activacion]
     paths: ['www/**', 'desktop/**', '.github/workflows/desktop.yml']
   workflow_dispatch:
 
@@ -71,9 +71,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete windows --yes --cleanup-tag || true
-          gh release create windows desktop/dist/Claudio-Setup.exe \
-            --target "${{ github.sha }}" \
-            --title "Claudio para Windows" \
-            --notes "Instalador de Claudio para Windows (círculo flotante, atajo Ctrl+Mayús+Espacio, activación por voz). Compilado desde ${GITHUB_SHA::7}." \
-            --latest=false
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            gh release delete windows --yes --cleanup-tag || true
+            gh release create windows desktop/dist/Claudio-Setup.exe \
+              --target "${{ github.sha }}" \
+              --title "Claudio para Windows" \
+              --notes "Instalador de Claudio para Windows (círculo flotante, atajo Ctrl+Mayús+Espacio, activación por voz). Compilado desde ${GITHUB_SHA::7}." \
+              --latest=false
+          else
+            gh release delete windows-prueba --yes --cleanup-tag || true
+            gh release create windows-prueba desktop/dist/Claudio-Setup.exe \
+              --target "${{ github.sha }}" \
+              --title "Claudio para Windows — versión de prueba (${GITHUB_REF_NAME})" \
+              --notes "Instalador de prueba compilado desde ${GITHUB_SHA::7} (rama ${GITHUB_REF_NAME}). No reemplaza la versión estable." \
+              --prerelease --latest=false
+          fi
