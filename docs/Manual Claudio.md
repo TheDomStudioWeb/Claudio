@@ -78,6 +78,14 @@ Para que la escucha del nombre no se duerma: Ajustes → Apps → Claudio → Ba
 - El reconocimiento de voz funciona **sin internet** con un modelo en español incorporado; la IA sí necesita conexión.
 - Instalación: Windows puede mostrar "Windows protegió su PC" porque la app no tiene firma comercial: tocar **Más información → Ejecutar de todas formas**. Si no escucha, revisar Configuración → Privacidad → Micrófono → permitir apps de escritorio.
 
+### Que no se active con cualquier charla (Windows y teléfono)
+- **Después de responder** Claudio escucha como máximo **2 repreguntas seguidas**, con una ventana corta (5 segundos). Si no le hablan, vuelve a esperar su nombre. Antes seguía escuchando sin parar y se enganchaba con cualquier conversación de fondo.
+- **Cerrar la charla:** decirle «gracias», «listo», «chau», «eso es todo» o «silencio» corta la conversación sin respuesta y sin seguir escuchando.
+- **Apagar la escucha por nombre:** decirle «dejá de escuchar» (o «no me escuches»), o desmarcar **Escuchar mi nombre** en el menú del ícono junto al reloj. Para llamarlo después: atajo Ctrl + Mayús + Espacio o tocar el círculo. Se vuelve a activar marcando de nuevo esa opción.
+- **Detección del nombre más estricta (Windows):** el nombre tiene que decirse al comienzo de la frase, bien pronunciado y con buena confianza; palabras parecidas como «claro» o «audio» ya no lo activan.
+- **Si todavía se activa solo:** subir el valor de **Sensibilidad** en Protocolos lo vuelve más exigente (menos falsos avisos). Si no lo escucha a usted, bajarlo un poco.
+- **Cuidado en reuniones o videollamadas:** si hay gente hablando cerca, conviene desmarcar **Escuchar mi nombre**.
+
 ## Modo reunión (solo teléfono Android)
 
 Graba una reunión en segundo plano, solo audio, en archivos de unos 25 minutos guardados en Música > Claudio Reuniones, para transcribirlos después con Gemini. Se inicia diciendo "Claudio, empezá la reunión" o con el botón del círculo con punto. Mientras graba, Claudio no escucha ni habla; se termina desde la notificación, la barra roja o el panel. No graba llamadas ni videollamadas. Ver el manual aparte "Manual Modo Reunion".

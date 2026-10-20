@@ -135,11 +135,13 @@ function createWindow() {
 }
 
 /* ---------- Ícono junto al reloj ---------- */
+let wakeOn = true;
 function rebuildTray() {
   if (!tray) return;
   const startup = app.getLoginItemSettings().openAtLogin;
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: mode === 'full' ? 'Reducir a círculo' : 'Abrir panel', click: () => setMode(mode === 'full' ? 'mini' : 'full') },
+    { label: 'Escuchar mi nombre', type: 'checkbox', checked: wakeOn, click: () => { if (win) win.webContents.send('desk:wake-toggle'); } },
     { label: 'Hablar (Ctrl + Mayús + Espacio)', click: () => { showWindow(); win.webContents.send('desk:hotkey'); } },
     { label: win && win.isVisible() ? 'Ocultar' : 'Mostrar', click: () => { if (win.isVisible()) win.hide(); else showWindow(); rebuildTray(); } },
     { type: 'separator' },
@@ -171,6 +173,7 @@ app.whenReady().then(async () => {
 
   ipcMain.on('desk:set-mode', (e, m) => setMode(m));
   ipcMain.on('desk:hide', () => { win.hide(); rebuildTray(); });
+  ipcMain.on('desk:wake-state', (e, on) => { wakeOn = !!on; rebuildTray(); });
 
   globalShortcut.register(HOTKEY, () => { showWindow(); win.webContents.send('desk:hotkey'); });
   screen.on('display-metrics-changed', () => setMode(mode));

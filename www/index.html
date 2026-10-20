@@ -381,6 +381,8 @@ function renderLog(){
 
 /* ---------- Voz: salida ---------- */
 const synth = window.speechSynthesis;
+const FOLLOW_MAX = 2; let followCount = 0;
+function notifyWake(){ try { if (window.claudioDesktop && claudioDesktop.wakeState) claudioDesktop.wakeState(!!cfg.wake); } catch {} }
 let voices = [], pending = 0, streamDone = true, stopped = false, abortCtrl = null;
 
 function fillVoices(){
@@ -441,9 +443,12 @@ function checkDone(){
   pending = 0;
   if (document.body.dataset.state !== 'error') setState('idle');
   if (pendingReunion){ const f = pendingReunion; pendingReunion = null; stopped = true; setTimeout(() => iniciarReunion(f), 300); return; }
-  if (cfg.converse && !stopped){
+  if (cfg.converse && !stopped && followCount < FOLLOW_MAX){
+    // Conversación acotada: tras responder escucha hasta FOLLOW_MAX repreguntas seguidas (ventana corta);
+    // después vuelve a esperar el nombre, para no engancharse con charlas de fondo.
+    followCount++;
     clearTimeout(setState._r); // la conversación sigue: no reactivar la escucha del nombre
-    setTimeout(() => { if (!stopped && document.body.dataset.state === 'idle') listen(); }, 800);
+    setTimeout(() => { if (!stopped && document.body.dataset.state === 'idle') listen({follow: true}); }, 800);
   }
 }
 function stopAll(){
@@ -489,7 +494,7 @@ async function listenNative(opts = {}){
     WK.cancelListen().catch(() => {});
     listening = false;
     const t = last.trim();
-    if (t) ask(t); else { capUser(''); setState('idle'); }
+    if (t) ask(t); else { followCount = FOLLOW_MAX; capUser(''); setState('idle'); }
   };
   finishListen = () => { WK.stopListen().catch(() => {}); arm(1200); }; // tocar el mic: cerrar y procesar lo dicho
   try {
@@ -513,6 +518,7 @@ async function listenNative(opts = {}){
 }
 
 function listen(opts){
+  if (!(opts && opts.follow)) followCount = 0;
   if (reunionOn){ toast('Modo reunión: Claudio no escucha hasta que termine la grabación.', 3500); return; }
   if (NATIVE) return listenNative(opts);
   if (DESK) return listenDesk(opts);
@@ -901,13 +907,17 @@ function makeWakeRec(){
   if (!vosk.model) return;
   try { if (vosk.wakeRec) vosk.wakeRec.remove(); } catch {}
   vosk.key = wakeKey();
-  vosk.wakeRec = new vosk.model.KaldiRecognizer(vosk.ctx.sampleRate, JSON.stringify([vosk.key, '[unk]']));
+  // Palabras parecidas o muy comunes ("claro", "audio"…) compiten con el nombre: así el reconocedor no
+  // fuerza cualquier sonido a "claudio". Las que no estén en el modelo se ignoran.
+  const decoys = vosk.key === 'claudio' ? ['claro', 'audio', 'claudia', 'radio', 'clase', 'clave', 'cuando', 'gracias'] : [];
+  vosk.wakeRec = new vosk.model.KaldiRecognizer(vosk.ctx.sampleRate, JSON.stringify([vosk.key, ...decoys, '[unk]']));
   vosk.wakeRec.setWords(true);
   vosk.wakeRec.on('result', m => {
     if (vosk.mode !== 'wake') return;
     const r = (m && m.result) || {}, words = r.result || [];
-    const minConf = Math.max(0.2, Math.min(0.95, 1.2 - (cfg.sens || 0.6)));
-    const hit = words.length ? words.some(w => w.word === vosk.key && (w.conf ?? 1) >= minConf) : String(r.text || '').split(/\s+/).includes(vosk.key);
+    const minConf = Math.max(0.4, Math.min(0.97, 1.3 - (cfg.sens || 0.6))); // sens .6 → 0.70
+    // El nombre debe estar entre las dos primeras palabras de la frase, bien pronunciado (≥0,3 s) y con buena confianza.
+    const hit = words.slice(0, 2).some(w => w.word === vosk.key && (w.conf ?? 1) >= minConf && ((w.end - w.start) || 0.4) >= 0.3);
     if (hit) onDeskWake();
   });
 }
@@ -979,7 +989,7 @@ async function listenDesk(opts = {}){
     else if (last) finish();
   };
   vosk.mode = 'dict';
-  arm(9000);
+  arm(opts.follow ? 5000 : 9000);
 }
 function deskSetMode(mode){
   if (mode === 'mini') document.querySelectorAll('.sheet.open').forEach(el => el.classList.remove('open'));
@@ -1100,7 +1110,15 @@ function explainError(msg){
   return 'Tuve un problema de conexión con mis sistemas.';
 }
 
+const FIN_RE = /^(gracias|muchas gracias|chau|chao|listo|eso es todo|nada mas|ok|dale|perfecto|bueno|callate|silencio|basta|para)(\s+claudio)?$/;
+const NOESCUCHAR_RE = /(deja(s|r)? de escuchar|no (me )?escuches|apaga(r)? la escucha|pausa la escucha)/;
 async function ask(text){
+  const nt = norm(text).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (NOESCUCHAR_RE.test(nt)){ // apagar la escucha por nombre desde la voz
+    cfg.wake = false; saveCfg(); stopAll(); followCount = FOLLOW_MAX; if (DESK) vosk.mode = 'off'; if (WK) WK.stop().catch(() => {});
+    capUser(''); capBot('Listo, dejo de escuchar mi nombre. Para llamarme use el atajo o toque el círculo.'); toast('Escucha por nombre apagada.', 3500); setState('idle'); notifyWake(); return;
+  }
+  if (FIN_RE.test(nt)){ stopAll(); followCount = FOLLOW_MAX; capUser(''); setState('idle'); return; } // cierre de la charla: sin respuesta ni más escucha
   if (!cfg.key){ toast('Primero configure su clave de API en Protocolos.'); openSheet('#cfgSheet'); return; }
   stopAll(); stopped = false;
   if (mem.speaker && Date.now() - mem.lastAt > 20 * 60e3){ mem.speaker = null; renderWho(); } // tras 20 min, vuelve a ser usted
@@ -1282,6 +1300,8 @@ if (DESK){
   $('#btnMini').onclick = () => DESK.setMode('mini');
   DESK.onMode(deskSetMode);
   DESK.onHotkey(() => { bootDone(false); micAction(); });
+  DESK.onWakeToggle(() => { cfg.wake = !cfg.wake; saveCfg(); $('#cWake').checked = cfg.wake; if (!cfg.wake) vosk.mode = 'off'; else deskMode(document.body.dataset.state); toast(cfg.wake ? 'Escucho mi nombre otra vez.' : 'Escucha por nombre en pausa. Use el atajo o toque el círculo.', 3000); notifyWake(); });
+  notifyWake();
 }
 if (WK){
   $('#wakeBox').style.display = 'block';
