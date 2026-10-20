@@ -70,6 +70,7 @@ public class ReunionService extends Service {
     private volatile boolean stopRequested = false;
     private Thread worker;
     private PowerManager.WakeLock wakeLock;
+    private PowerManager.WakeLock screenLock;
     private MediaProjection projection;
 
     private String fuente = "mic";
@@ -177,6 +178,15 @@ public class ReunionService extends Service {
         if (pm != null) {
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "claudio:reunion");
             wakeLock.acquire(8L * 60L * 60L * 1000L);
+            // Con el audio del teléfono, la app que reproduce se pausa si la pantalla se apaga: se la mantiene encendida (tenue).
+            if ("sistema".equals(fuente)) {
+                try {
+                    @SuppressWarnings("deprecation")
+                    PowerManager.WakeLock sl = pm.newWakeLock(PowerManager.SCREEN_DIM_WAKE_LOCK | PowerManager.ON_AFTER_RELEASE, "claudio:reunion-pantalla");
+                    screenLock = sl;
+                    sl.acquire(8L * 60L * 60L * 1000L);
+                } catch (Exception ignored) { screenLock = null; }
+            }
         }
 
         worker = new Thread(this::grabar, "claudio-reunion");
@@ -455,6 +465,8 @@ public class ReunionService extends Service {
         if (projection != null) { try { projection.stop(); } catch (Exception ignored) {} projection = null; }
         if (wakeLock != null && wakeLock.isHeld()) { try { wakeLock.release(); } catch (Exception ignored) {} }
         wakeLock = null;
+        if (screenLock != null && screenLock.isHeld()) { try { screenLock.release(); } catch (Exception ignored) {} }
+        screenLock = null;
         worker = null;
         // Claudio vuelve a escuchar su nombre.
         WakeWordService.reunion = false;

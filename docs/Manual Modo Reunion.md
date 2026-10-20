@@ -45,6 +45,7 @@ Recomendaciones: una parte por vez si Gemini limita la duración; al pegar la si
 ## Problemas frecuentes
 
 - **"No pude iniciar la reunión":** falta el permiso de micrófono o de notificaciones. Aceptarlos cuando Android los pida.
+- **Con "Audio del teléfono" la pantalla no se apaga** mientras graba (queda tenue), porque si se apaga la app que reproduce se pausa. Al terminar vuelve a la normalidad. Conviene tener el teléfono enchufado en reuniones largas.
 - **La barra de nivel no se mueve con "Audio del teléfono":** la app que reproduce el audio puede bloquear su captura. Probar con el micrófono, acercando el teléfono a la fuente.
 - **Se cortó la grabación:** probablemente Android cerró la app por batería. Desactivar la optimización de batería para Claudio. Solo se pierde la parte en curso; las partes anteriores quedan guardadas.
 - **No aparece la carpeta:** buscar en la app de archivos del teléfono, dentro de **Música**.
