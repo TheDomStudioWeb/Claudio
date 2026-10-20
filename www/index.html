@@ -340,6 +340,7 @@ const NTTS = NATIVE ? CAP.registerPlugin('TextToSpeech') : null;
 const WK = NATIVE ? CAP.registerPlugin('WakeWord') : null;
 const PH = NATIVE ? CAP.registerPlugin('Phone') : null;
 const RU = NATIVE ? CAP.registerPlugin('Reunion') : null;
+const AR = NATIVE ? CAP.registerPlugin('Archivos') : null;
 let reunionOn = false;        // mientras graba una reunión, Claudio no escucha ni habla
 let pendingReunion = null;    // reunión pedida por voz: arranca cuando Claudio termina de responder
 const DESK = (!NATIVE && window.claudioDesktop) || null; // app de escritorio (Windows)
@@ -590,7 +591,7 @@ const TOOLS = [
 ];
 
 /* ---------- Asistente del teléfono (solo APK) ---------- */
-const ACTIONS = new Set(['crear_evento','modificar_evento','borrar_evento','responder_mensaje','enviar_whatsapp','enviar_sms','llamar']);
+const ACTIONS = new Set(['crear_evento','modificar_evento','borrar_evento','responder_mensaje','enviar_whatsapp','enviar_sms','llamar','copiar_archivos','limpiar_originales','restaurar_archivos']);
 const PHONE_TOOLS = !PH ? [] : [
   {name:'ver_agenda', description:'Lee los eventos del calendario (Google Calendar y demás cuentas del teléfono) entre dos fechas. Usala para "qué tengo hoy", "estoy libre el jueves", etc.',
    input_schema:{type:'object', properties:{desde:{type:'string', description:'Fecha y hora local ISO, ej 2026-10-15T00:00'}, hasta:{type:'string', description:'Fecha y hora local ISO'}}, required:['desde','hasta']}},
@@ -645,6 +646,9 @@ function describeAction(name, i){
     case 'enviar_whatsapp': return `preparar un WhatsApp a ${i.para || i.telefono}: "${i.texto}"`;
     case 'enviar_sms': return `enviar un SMS a ${i.para || i.telefono}: "${i.texto}"`;
     case 'llamar': return `llamar a ${i.para || i.telefono}`;
+    case 'copiar_archivos': return 'copiar los archivos encontrados a la carpeta nueva (los originales no se tocan)';
+    case 'limpiar_originales': return 'mandar los originales y los repetidos a la papelera de Claudio, donde quedan 7 días por si hace falta recuperarlos';
+    case 'restaurar_archivos': return 'devolver a su lugar original los archivos de la última limpieza';
   }
   return name;
 }
@@ -663,6 +667,16 @@ async function execAction(name, i){
     case 'enviar_whatsapp': await PH.whatsapp({phone: i.telefono, text: i.texto}); return 'Abrí el chat de WhatsApp con el mensaje escrito; falta que el usuario toque enviar.';
     case 'enviar_sms': await PH.sms({phone: i.telefono, text: i.texto}); return 'SMS enviado.';
     case 'llamar': await PH.dial({phone: i.telefono}); return 'Llamando.';
+    case 'copiar_archivos': {
+      const r = await AR.copiar();
+      if (!r.listoParaLimpiar) return `Copia INCOMPLETA: ${r.verificados} de ${r.total} verificados. Fallaron: ${(r.errores || []).join(', ')}. No se ofrece borrar nada. Informale al usuario.`;
+      return `Copia verificada: ${r.verificados} de ${r.total} archivos copiados y comparados uno por uno en ${r.destino}. Los originales siguen donde estaban. Preguntale si ahora quiere mandar los originales y repetidos a la papelera (limpiar_originales).`;
+    }
+    case 'limpiar_originales': {
+      const r = await AR.limpiar();
+      return `Listo: ${r.movidos} archivos movidos a la papelera de Claudio (${r.fallas} no se pudieron mover). Quedan ${r.diasPapelera} días ahí; si quiere deshacerlo, restaurar_archivos.`;
+    }
+    case 'restaurar_archivos': { const r = await AR.restaurar(); return `Devolví ${r.restaurados} archivos a su lugar original.`; }
   }
   return 'Acción desconocida.';
 }
@@ -722,6 +736,37 @@ Podés manejar el teléfono del usuario con tus herramientas: agenda (Google Cal
 - Nunca accedas a apps bancarias, billeteras ni medios de pago, aunque te lo pidan. Están bloqueadas.
 - Al leer mensajes, resumí: quién y qué, sin leer textos larguísimos completos salvo que te lo pidan.
 - Si falta un permiso o el teléfono está bloqueado, decilo con claridad.`;
+}
+
+/* ---------- Juntar archivos en una carpeta (solo APK) ---------- */
+const ARCHIVO_TOOLS = !AR ? [] : [
+  {name:'buscar_archivos', description:'Busca en el teléfono los archivos cuyo NOMBRE contiene alguna de las palabras y que se modificaron en los últimos N días. No toca nada: arma un plan (qué se conserva, repetidos, versiones anteriores y dudosos). Usala cuando pida juntar/ordenar archivos de un tema.',
+   input_schema:{type:'object', properties:{palabras:{type:'array', items:{type:'string'}, description:'Palabras del nombre, ej. financo, domino, tirasso, x5'}, dias:{type:'integer', description:'Últimos N días (3 semanas = 21)'}, carpeta:{type:'string', description:'Nombre de la carpeta destino en Documentos'}}, required:['palabras']}},
+  {name:'copiar_archivos', description:'Copia a la carpeta nueva los archivos del último buscar_archivos y verifica cada copia. No toca los originales. Requiere confirmación.', input_schema:{type:'object', properties:{}}},
+  {name:'limpiar_originales', description:'SOLO después de una copia verificada: manda los originales y los repetidos a la papelera de Claudio (7 días). Requiere confirmación.', input_schema:{type:'object', properties:{}}},
+  {name:'restaurar_archivos', description:'Deshace la última limpieza devolviendo los archivos a su lugar. Requiere confirmación.', input_schema:{type:'object', properties:{}}}
+];
+function archivosBlock(){
+  if (!AR) return '';
+  return `\n\nJUNTAR ARCHIVOS
+Podés juntar en una carpeta (Documentos) los archivos de un tema: buscar_archivos → copiar_archivos → limpiar_originales. Siempre en ese orden y con el "sí" del usuario en cada paso de copiar y limpiar.
+- Buscás por NOMBRE y fecha de modificación, no por contenido; decíselo. Si pide FINANCO y DOMINO usá palabras como financo, domino, tirasso, x5 salvo que indique otras. "Tres semanas" = 21 días.
+- Antes de copiar, resumí el plan: encontrados, cuántos se conservan, repetidos, versiones anteriores y dudosos (los dudosos no se deciden solos: preguntale qué hacer; no se tocan).
+- Copiar NO borra nada. Después de copiar se verifica cada archivo; si falla alguno, no ofrezcas limpiar.
+- limpiar_originales manda los originales a una papelera de 7 días (no borra de golpe). Si se arrepiente, restaurar_archivos.
+- Nunca toques apps bancarias ni carpetas de otras apps salvo para leer archivos que coinciden con la búsqueda.`;
+}
+async function runArchivoTool(name, i){
+  i = i || {};
+  if (name !== 'buscar_archivos') return null;
+  try {
+    const r = await AR.buscar({palabras: i.palabras || [], dias: i.dias || 21, carpeta: i.carpeta || 'FINANCO-DOMINO'});
+    if (!r.encontrados) return 'No encontré archivos con esas palabras en el nombre en ese período.';
+    return 'PLAN (todavía no se tocó nada). ' + JSON.stringify(r) + ' Explicale en pocas frases: cuántos encontró, cuántos se conservan, cuántos son repetidos o versiones anteriores y los dudosos (esos no se deciden solos). Aclará que busca por nombre, no por contenido. Preguntale si copia (copiar_archivos).';
+  } catch (e){
+    if (String((e && e.message) || e).includes('SIN_PERMISO')){ try { await AR.pedirPermiso(); } catch {} return 'Falta el permiso "Acceso a todos los archivos". Abrí la pantalla de Android: decile que active Claudio ahí, vuelva a la app y repita el pedido.'; }
+    return errMsg(e);
+  }
 }
 
 /* ---------- Modo reunión (solo APK) ---------- */
@@ -828,7 +873,8 @@ function runTool(name, input){
     const m = findManual((input || {}).nombre || '');
     return m ? 'Manual "' + m.title + '":\n' + m.text : 'No hay un manual con ese nombre. Manuales disponibles: ' + (manuals.map(x => x.title).join(', ') || 'ninguno') + '.';
   }
-  if (PH && PHONE_TOOLS.some(t => t.name === name)) return runPhoneTool(name, input);
+  if (AR && ARCHIVO_TOOLS.some(t => t.name === name) && name === 'buscar_archivos') return runArchivoTool(name, input);
+  if (PH && (PHONE_TOOLS.some(t => t.name === name) || ARCHIVO_TOOLS.some(t => t.name === name))) return runPhoneTool(name, input);
   if (RU && REUNION_TOOLS.some(t => t.name === name)) return runReunionTool(name, input);
   input = input || {};
   try {
@@ -1012,7 +1058,7 @@ Tus respuestas se escuchan en voz alta, así que:
 Si no sabés algo o necesitás información actual que no tenés, decilo con honestidad.
 Respondé solo lo que te piden en el último mensaje. No repitas información de turnos anteriores ni agregues datos que no te pidieron.
 Confiá en tus respuestas anteriores: si diste un dato, fue verificado en su momento. No te disculpes ni te corrijas por turnos pasados salvo que el usuario señale un error concreto.
-Fecha y hora actual: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '') + memoryBlock() + manualsBlock() + phoneBlock() + reunionBlock();
+Fecha y hora actual: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '') + memoryBlock() + manualsBlock() + phoneBlock() + reunionBlock() + archivosBlock();
 }
 
 function buildMessages(){
@@ -1038,7 +1084,7 @@ function buildMessages(){
 }
 
 async function callClaude(messages, onText){
-  const tools = [...TOOLS, ...PHONE_TOOLS, ...REUNION_TOOLS];
+  const tools = [...TOOLS, ...PHONE_TOOLS, ...REUNION_TOOLS, ...ARCHIVO_TOOLS];
   if (cfg.web) tools.push({type:'web_search_20250305', name:'web_search', max_uses:3});
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST', signal: abortCtrl.signal,

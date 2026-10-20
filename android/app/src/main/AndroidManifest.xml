@@ -66,6 +66,10 @@
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
+    <!-- Juntar archivos en una carpeta (Acceso a todos los archivos) -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 
     <!-- Apps que Claudio necesita ver para abrirlas o enviarles mensajes -->
     <queries>

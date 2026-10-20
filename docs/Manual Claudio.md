@@ -101,3 +101,19 @@ Graba una reunión en segundo plano, solo audio, en archivos de unos 25 minutos 
 ## Costos de uso (referencia)
 
 Con el núcleo Haiku, cada interacción cuesta menos de un décimo de centavo de dólar; con uso intenso, menos de un dólar por mes. Sonnet cuesta unas 20 veces más y Opus unas 40.
+
+## Juntar archivos en una sola carpeta (APK)
+
+Claudio puede juntar en una carpeta los archivos de un tema (por ejemplo FINANCO y DOMINO de las últimas 3 semanas), quedarse con la última versión y limpiar los lugares viejos. Se le pide por voz: "Claudio, juntá todo lo de FINANCO y DOMINO de las últimas tres semanas".
+
+**Primera vez:** Android abre la pantalla "Acceso a todos los archivos". Hay que activar Claudio y volver a la app.
+
+**Paso a paso (siempre con tu confirmación):**
+1. **Buscar** (no toca nada). Busca por el *nombre* del archivo y la fecha de modificación (no mira el contenido). Cuenta cuántos encuentra, cuántos son repetidos y cuántas son versiones anteriores.
+2. **Copiar.** Crea `Documentos/FINANCO-DOMINO` y copia ahí lo que se conserva. Cada copia se compara con el original. Los originales siguen en su lugar.
+3. **Limpiar.** Solo si la copia salió perfecta y decís que sí, los originales y los repetidos se mueven a `Documentos/_papelera_claudio`. Quedan 7 días y después se borran solos.
+4. **Deshacer.** "Claudio, restaurá los archivos" los devuelve a su lugar original (último lote).
+
+**Cómo elige la última versión:** si dos archivos son idénticos, deja uno. Si tienen nombres de la misma familia (`GUIA_v2`, `GUIA (3)`, `GUIA_final`) y contenido distinto, deja el más nuevo. Si son muy distintos en tamaño, los marca como dudosos y te pregunta; no los toca.
+
+**Límites:** no busca dentro del contenido de los archivos, no entra a carpetas privadas de otras apps (Android/data) y nunca toca apps bancarias.
