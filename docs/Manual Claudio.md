@@ -131,4 +131,4 @@ Claudio puede sacar fotos y grabar videos **sin abrir la app de cámara**. Todo 
 - Claudio no ve las fotos: confirma que las sacó, pero no las describe.
 
 ## La imagen de Claudio
-En pantalla Claudio se muestra con su imagen holográfica animada: el anillo azul gira alrededor de la carita cuando escucha (más rápido) o habla (la carita late con la voz). Al pensar, el anillo se abre con ondas y se transforma en la esfera con órbitas que giran; en rojo si hubo un error.
+En pantalla Claudio se muestra con su imagen holográfica animada: el anillo azul gira alrededor de la carita cuando escucha (más rápido) o habla (la carita late con la voz). Al pensar, el anillo se vuelve dorado, gira como una moneda y se convierte en una esfera de alambre con ojos y órbitas doradas girando; en rojo si hubo un error.
