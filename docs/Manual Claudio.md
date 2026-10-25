@@ -117,3 +117,16 @@ Claudio puede juntar en una carpeta los archivos de un tema (por ejemplo FINANCO
 **Cómo elige la última versión:** si dos archivos son idénticos, deja uno. Si tienen nombres de la misma familia (`GUIA_v2`, `GUIA (3)`, `GUIA_final`) y contenido distinto, deja el más nuevo. Si son muy distintos en tamaño, los marca como dudosos y te pregunta; no los toca.
 
 **Límites:** no busca dentro del contenido de los archivos, no entra a carpetas privadas de otras apps (Android/data) y nunca toca apps bancarias.
+
+## Cámara: fotos y videos directos (APK)
+Claudio puede sacar fotos y grabar videos **sin abrir la app de cámara**. Todo queda en la galería, en la carpeta **Claudio** (fotos en Pictures/Claudio, videos en Movies/Claudio).
+- **Foto:** "Claudio, sacame una foto", "una selfie", "una foto en 5 segundos", "con flash". Por defecto usa la cámara trasera; "selfie" o "de frente" usa la frontal.
+- **Video:** "Claudio, grabá un video". Para terminar: tocar el círculo y decir "detener video". Corta solo a los 10 minutos si se olvida.
+- La primera vez Android pide permiso de cámara (y micrófono para el sonido del video); después hay que repetir el pedido.
+- **Siempre suena el obturador y Android muestra el indicador de cámara en uso**; Claudio no lo oculta.
+- **Claudio tiene que estar abierto en pantalla.** Android no deja usar la cámara desde segundo plano ni con la pantalla apagada.
+- Mientras graba un video no escucha su nombre; al detener el video vuelve a escucharlo.
+- Claudio no ve las fotos: confirma que las sacó, pero no las describe.
+
+## La imagen de Claudio
+En pantalla Claudio se muestra con su imagen holográfica: el anillo azul con la carita cuando escucha o habla, la esfera con órbitas cuando piensa, y en rojo si hubo un error.

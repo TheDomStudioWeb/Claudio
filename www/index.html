@@ -54,6 +54,25 @@ body[data-state=listening] .core{animation:breathe .9s ease-in-out infinite}
 body[data-state=speaking] .core{animation:talk .32s ease-in-out infinite alternate}
 body[data-state=speaking] .r4{animation-duration:5s}
 .core-label{font-family:Orbitron;font-size:9px;letter-spacing:.3em;fill:#02121c;font-weight:700}
+/* Imagen de Claudio: hablando/escuchando (anillo) y pensando (esfera) */
+.hud{display:none}
+.orbimg{position:absolute;inset:0;pointer-events:none}
+.orbimg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .55s ease,transform .55s ease,filter .4s;
+  -webkit-mask-image:radial-gradient(circle closest-side,#000 80%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 80%,transparent 100%)}
+.orbimg .oh{opacity:.82;filter:brightness(.82);animation:breathe 4s ease-in-out infinite}
+.orbimg .op{transform:scale(.82);-webkit-mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%)}
+.orbimg .or{position:absolute;left:50%;top:50%;width:82%;height:82%;margin:-41% 0 0 -41%;border-radius:50%;border:2px solid rgba(140,235,255,.75);box-shadow:0 0 14px rgba(56,215,255,.8);opacity:0;transition:opacity .5s;transform-style:preserve-3d}
+.orbimg .or i{position:absolute;left:50%;top:-6px;width:11px;height:11px;margin-left:-5px;border-radius:50%;background:#e8fdff;box-shadow:0 0 12px 4px #38d7ff}
+@keyframes orbA{from{transform:rotateX(72deg) rotateZ(0)}to{transform:rotateX(72deg) rotateZ(360deg)}}
+@keyframes orbB{from{transform:rotateX(72deg) rotateY(60deg) rotateZ(360deg)}to{transform:rotateX(72deg) rotateY(60deg) rotateZ(0)}}
+@keyframes orbC{from{transform:rotateX(72deg) rotateY(120deg) rotateZ(0)}to{transform:rotateX(72deg) rotateY(120deg) rotateZ(360deg)}}
+.orbimg .o1{animation:orbA 7s linear infinite}.orbimg .o2{animation:orbB 7s linear infinite}.orbimg .o3{animation:orbC 4.5s linear infinite}
+body[data-state=listening] .orbimg .oh{opacity:1;filter:brightness(1.05);animation:breathe .9s ease-in-out infinite}
+body[data-state=speaking] .orbimg .oh{opacity:1;filter:brightness(1.15);animation:talk .32s ease-in-out infinite alternate}
+body[data-state=thinking] .orbimg .oh{opacity:0;animation:none}
+body[data-state=thinking] .orbimg .op{opacity:1;transform:scale(.9);animation:breathe 2.2s ease-in-out infinite}
+body[data-state=thinking] .orbimg .or{opacity:.85}
+body[data-state=error] .orbimg .oh{opacity:1;filter:hue-rotate(150deg) saturate(1.4) brightness(.95)}
 
 .caption{width:100%;max-width:620px;flex:1;min-height:0;overflow-y:auto;padding:14px 4px 8px;text-align:center;
   mask-image:linear-gradient(transparent,#000 14px,#000 calc(100% - 14px),transparent)}
@@ -186,6 +205,7 @@ html.desk.mini .core-hit, html.desk.mini .expand{display:grid}
       <circle class="core" cx="150" cy="150" r="52"/>
       <text class="core-label" id="coreLabel" x="150" y="153" text-anchor="middle">CLAUDIO</text>
     </svg>
+    <div class="orbimg" aria-hidden="true"><img class="oh" src="orb-habla.webp" alt=""><img class="op" src="orb-piensa.webp" alt=""><div class="or o1"><i></i></div><div class="or o2"><i></i></div><div class="or o3"><i></i></div></div>
     <div class="core-hit" id="coreHit" title="Hablar (Ctrl+Mayús+Espacio)"></div>
     <button class="expand" id="btnExpand" title="Abrir panel" aria-label="Abrir panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg></button>
   </div>
@@ -341,6 +361,7 @@ const WK = NATIVE ? CAP.registerPlugin('WakeWord') : null;
 const PH = NATIVE ? CAP.registerPlugin('Phone') : null;
 const RU = NATIVE ? CAP.registerPlugin('Reunion') : null;
 const AR = NATIVE ? CAP.registerPlugin('Archivos') : null;
+const CAM = NATIVE ? CAP.registerPlugin('Camara') : null;
 let reunionOn = false;        // mientras graba una reunión, Claudio no escucha ni habla
 let pendingReunion = null;    // reunión pedida por voz: arranca cuando Claudio termina de responder
 const DESK = (!NATIVE && window.claudioDesktop) || null; // app de escritorio (Windows)
@@ -361,7 +382,7 @@ function setState(s){
   document.body.dataset.state = s; $('#status').textContent = LABEL[s] || s;
   clearTimeout(setState._r);
   if (DESK) deskMode(s);
-  if (s === 'idle' && WK && cfg.wake && !reunionOn) setState._r = setTimeout(() => { if (document.body.dataset.state === 'idle' && !listening && !reunionOn) WK.resume().catch(() => {}); }, 900);
+  if (s === 'idle' && WK && cfg.wake && !reunionOn) setState._r = setTimeout(() => { if (document.body.dataset.state === 'idle' && !listening && !reunionOn && !videoOn) WK.resume().catch(() => {}); }, 900);
 }
 const AN = () => cfg.aname || 'Claudio';
 function applyName(){
@@ -769,6 +790,56 @@ async function runArchivoTool(name, i){
   }
 }
 
+/* ---------- Cámara: fotos y videos directos (solo APK) ---------- */
+const CAMARA_TOOLS = !CAM ? [] : [
+  {name:'sacar_foto', description:'Dispara el obturador y guarda una foto en la galería (carpeta Claudio) SIN abrir la app de cámara. Suena el obturador. Opcional: cámara frontal (selfie), flash, y una cuenta regresiva en segundos.',
+   input_schema:{type:'object', properties:{camara:{type:'string', enum:['trasera','frontal']}, flash:{type:'boolean'}, demora_segundos:{type:'integer', description:'Cuenta regresiva antes de disparar (0 a 10)'}}}},
+  {name:'iniciar_video', description:'Empieza a grabar un video (con sonido) en la galería, carpeta Claudio, sin abrir la app de cámara. Sigue grabando hasta detener_video o hasta max_segundos.',
+   input_schema:{type:'object', properties:{camara:{type:'string', enum:['trasera','frontal']}, max_segundos:{type:'integer', description:'Corte automático; por defecto 600'}}}},
+  {name:'detener_video', description:'Termina el video que se está grabando y lo guarda.', input_schema:{type:'object', properties:{}}}
+];
+function camaraBlock(){
+  if (!CAM) return '';
+  return `\n\nCÁMARA
+Podés sacar fotos (sacar_foto) y grabar videos (iniciar_video / detener_video) sin abrir la app de cámara; quedan en la galería, carpeta "Claudio".
+- Por defecto cámara trasera; "selfie" o "de frente" = frontal. Si pide "en 5 segundos", usá demora_segundos.
+- Ejecutalo directamente cuando lo pida; después confirmale en una frase corta. No describas la imagen: no la ves.
+- Suena el obturador y Android muestra su indicador de cámara: nunca lo ocultes ni digas que es silencioso.
+- Solo funciona con Claudio abierto en pantalla. Si falta el permiso de cámara, se le pide y que lo repita.
+- Mientras grabás video no escuchás tu nombre: para terminar, el usuario toca el círculo y dice "detener video".`;
+}
+var videoOn = false;
+async function runCamaraTool(name, i){
+  i = i || {};
+  try {
+    if (name === 'sacar_foto'){
+      const d = Math.max(0, Math.min(10, i.demora_segundos | 0));
+      if (d) await new Promise(r => setTimeout(r, d * 1000));
+      const r = await CAM.foto({camara: i.camara === 'frontal' ? 'frontal' : 'trasera', flash: !!i.flash});
+      return `Foto sacada y guardada: ${r.nombre} (galería, carpeta Claudio). Confirmáselo en una frase.`;
+    }
+    if (name === 'iniciar_video'){
+      try { await WK.pause(); } catch {}
+      const r = await CAM.iniciarVideo({camara: i.camara === 'frontal' ? 'frontal' : 'trasera', maxSegundos: i.max_segundos || 600});
+      videoOn = true;
+      return `Grabando video (${r.nombre}). Avisale en una frase que empezó y que para terminar toque el círculo y diga "detener video".`;
+    }
+    if (name === 'detener_video'){
+      const r = await CAM.detenerVideo();
+      videoOn = false;
+      try { WK && cfg.wake && WK.resume(); } catch {}
+      return `Video guardado: ${r.nombre}, ${r.segundos} segundos (galería, carpeta Claudio).`;
+    }
+  } catch (e){
+    const m = String((e && e.message) || e);
+    if (m.includes('SIN_PERMISO')){ try { await CAM.pedirPermiso(); } catch {} return 'Falta el permiso de cámara. Se lo pedí en pantalla: que lo acepte y vuelva a pedirte la foto.'; }
+    if (m.includes('NO_GRABANDO')) return 'No hay ningún video en curso.';
+    if (m.includes('YA_GRABANDO')) return 'Ya estoy grabando un video.';
+    return errMsg(e);
+  }
+  return null;
+}
+
 /* ---------- Modo reunión (solo APK) ---------- */
 const REUNION_TOOLS = !RU ? [] : [
   {name:'iniciar_reunion', description:'Empieza a grabar una reunión (solo audio, en segundo plano, en archivos de unos 25 minutos) y pasa a modo reunión: dejás de escuchar y de hablar hasta que el usuario termine la grabación desde la notificación o el botón rojo de la app. Usala cuando diga "empezá la reunión", "grabá la reunión", "modo reunión", etc. fuente: "mic" (micrófono, por defecto, para reuniones presenciales) o "sistema" (el audio que suena en el teléfono).',
@@ -875,6 +946,7 @@ function runTool(name, input){
   }
   if (AR && ARCHIVO_TOOLS.some(t => t.name === name) && name === 'buscar_archivos') return runArchivoTool(name, input);
   if (PH && (PHONE_TOOLS.some(t => t.name === name) || ARCHIVO_TOOLS.some(t => t.name === name))) return runPhoneTool(name, input);
+  if (CAM && CAMARA_TOOLS.some(t => t.name === name)) return runCamaraTool(name, input);
   if (RU && REUNION_TOOLS.some(t => t.name === name)) return runReunionTool(name, input);
   input = input || {};
   try {
@@ -1058,7 +1130,7 @@ Tus respuestas se escuchan en voz alta, así que:
 Si no sabés algo o necesitás información actual que no tenés, decilo con honestidad.
 Respondé solo lo que te piden en el último mensaje. No repitas información de turnos anteriores ni agregues datos que no te pidieron.
 Confiá en tus respuestas anteriores: si diste un dato, fue verificado en su momento. No te disculpes ni te corrijas por turnos pasados salvo que el usuario señale un error concreto.
-Fecha y hora actual: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '') + memoryBlock() + manualsBlock() + phoneBlock() + reunionBlock() + archivosBlock();
+Fecha y hora actual: ${now}.` + (cfg.ctx ? `\nContexto del usuario: ${cfg.ctx}` : '') + memoryBlock() + manualsBlock() + phoneBlock() + reunionBlock() + archivosBlock() + camaraBlock();
 }
 
 function buildMessages(){
@@ -1084,7 +1156,7 @@ function buildMessages(){
 }
 
 async function callClaude(messages, onText){
-  const tools = [...TOOLS, ...PHONE_TOOLS, ...REUNION_TOOLS, ...ARCHIVO_TOOLS];
+  const tools = [...TOOLS, ...PHONE_TOOLS, ...REUNION_TOOLS, ...ARCHIVO_TOOLS, ...CAMARA_TOOLS];
   if (cfg.web) tools.push({type:'web_search_20250305', name:'web_search', max_uses:3});
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method:'POST', signal: abortCtrl.signal,
