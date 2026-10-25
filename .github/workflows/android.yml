@@ -2,7 +2,7 @@ name: Compilar APK
 
 on:
   push:
-    branches: [main, modo-reunion, archivos-claudio, camara-claudio]
+    branches: [main, modo-reunion, archivos-claudio, camara-claudio, archivos-fix]
   workflow_dispatch:
 
 permissions:
