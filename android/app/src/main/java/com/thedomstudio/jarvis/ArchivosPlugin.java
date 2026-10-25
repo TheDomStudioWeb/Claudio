@@ -189,6 +189,18 @@ public class ArchivosPlugin extends Plugin {
             List<Arch> hallados = new ArrayList<>();
             recorrer(raiz(), claves, desde, hallados, destino, papelera);
 
+            // Palabras a dejar fuera desde el principio (ej. el currículum de otra persona)
+            List<String> fuera = new ArrayList<>();
+            JSArray exArr = call.getArray("excluir");
+            if (exArr != null) for (int i = 0; i < exArr.length(); i++) { String k = norm(exArr.getString(i)).trim(); if (k.length() >= 3) fuera.add(k); }
+            int excluidos = 0;
+            if (!fuera.isEmpty()) {
+                for (int i = hallados.size() - 1; i >= 0; i--) {
+                    String nn = norm(hallados.get(i).f.getName());
+                    for (String k : fuera) { if (nn.contains(k)) { hallados.remove(i); excluidos++; break; } }
+                }
+            }
+
             // Hash y agrupación
             for (Arch a : hallados) { try { a.hash = sha256(a.f); } catch (Exception e) { a.hash = "?" + a.f.getAbsolutePath(); } }
             Map<String, List<Arch>> porHash = new LinkedHashMap<>();
@@ -237,6 +249,7 @@ public class ArchivosPlugin extends Plugin {
             res.put("repetidos", rep);
             res.put("versionesAnteriores", ant);
             res.put("dudosos", dud);
+            res.put("excluidos", excluidos);
             res.put("destino", destino.getAbsolutePath());
             res.put("lista", cortar(conservar, 40));
             res.put("sobran", cortar(sobran, 25));
@@ -245,6 +258,30 @@ public class ArchivosPlugin extends Plugin {
         } catch (Exception e) {
             call.reject("No se pudo buscar: " + e.getMessage());
         }
+    }
+
+    /** Deja fuera del plan los archivos cuyo nombre contiene alguna palabra (no se copian ni se tocan). */
+    @PluginMethod
+    public void excluir(PluginCall call) {
+        if (plan.isEmpty()) { call.reject("Primero hay que buscar los archivos."); return; }
+        JSArray arr = call.getArray("palabras");
+        List<String> ks = new ArrayList<>();
+        try { if (arr != null) for (int i = 0; i < arr.length(); i++) { String k = norm(arr.getString(i)).trim(); if (k.length() >= 3) ks.add(k); } } catch (Exception ignored) {}
+        if (ks.isEmpty()) { call.reject("Faltan palabras."); return; }
+        JSArray nombres = new JSArray();
+        for (Arch a : plan) {
+            String nn = norm(a.f.getName());
+            for (String k : ks) { if (nn.contains(k) && !a.rol.equals("excluido")) { a.rol = "excluido"; a.copia = null; nombres.put(a.f.getName()); break; } }
+        }
+        copiaVerificada = false;
+        int cons = 0, ant = 0, rep = 0;
+        for (Arch a : plan) { if (a.rol.equals("conservar")) cons++; else if (a.rol.equals("anterior")) ant++; else if (a.rol.equals("repetido")) rep++; }
+        JSObject res = new JSObject();
+        res.put("excluidos", nombres);
+        res.put("conservar", cons);
+        res.put("versionesAnteriores", ant);
+        res.put("repetidos", rep);
+        call.resolve(res);
     }
 
     private static JSArray cortar(JSArray a, int max) {
@@ -262,11 +299,13 @@ public class ArchivosPlugin extends Plugin {
         if (plan.isEmpty() || destino == null) { call.reject("Primero hay que buscar los archivos."); return; }
         try {
             if (!destino.exists() && !destino.mkdirs()) { call.reject("No pude crear la carpeta " + destino.getAbsolutePath()); return; }
+            boolean conAnteriores = Boolean.TRUE.equals(call.getBoolean("incluirAnteriores", false));
             int ok = 0, fallas = 0, total = 0;
             JSArray errores = new JSArray();
             for (Arch a : plan) {
-                if (!a.rol.equals("conservar")) continue;
+                if (!(a.rol.equals("conservar") || (conAnteriores && a.rol.equals("anterior")))) continue;
                 total++;
+                if (a.copia != null && a.copia.exists() && a.copia.length() == a.size) { ok++; continue; }   // ya copiado antes: no se duplica
                 try {
                     File dst = nombreLibre(destino, a.f.getName());
                     try (InputStream in = new FileInputStream(a.f); OutputStream out = new FileOutputStream(dst)) {
@@ -309,6 +348,8 @@ public class ArchivosPlugin extends Plugin {
         if (!copiaVerificada) { call.reject("No se puede: la copia todavía no está verificada al 100 %."); return; }
         try {
             // Antes de mover, se vuelve a comprobar que cada copia sigue intacta.
+            java.util.Set<String> hashesCopiados = new java.util.HashSet<>();
+            for (Arch a : plan) { if (a.copia != null && a.copia.exists() && a.copia.length() == a.size) hashesCopiados.add(a.hash); }
             for (Arch a : plan) {
                 if (a.rol.equals("conservar") && (a.copia == null || !a.copia.exists() || a.copia.length() != a.size)) {
                     call.reject("Una copia ya no coincide (" + a.f.getName() + "). No se movió nada."); return;
@@ -318,9 +359,13 @@ public class ArchivosPlugin extends Plugin {
             File lote = new File(new File(carpetaDocumentos(), PAPELERA), dia);
             if (!lote.mkdirs() && !lote.exists()) { call.reject("No pude crear la papelera."); return; }
             JSONArray manifiesto = new JSONArray();
-            int movidos = 0, fallas = 0;
+            int movidos = 0, fallas = 0, sinTocar = 0;
             for (Arch a : plan) {
                 if (!a.f.exists()) continue;
+                // Solo va a la papelera lo que tiene una copia verificada (o es idéntico a algo ya copiado).
+                boolean conCopia = a.copia != null && a.copia.exists() && a.copia.length() == a.size;
+                boolean repetidoCopiado = a.rol.equals("repetido") && hashesCopiados.contains(a.hash);
+                if (!(conCopia || repetidoCopiado)) { sinTocar++; continue; }
                 File dst = nombreLibre(lote, a.f.getName());
                 boolean ok = a.f.renameTo(dst);
                 if (!ok) {
@@ -347,6 +392,7 @@ public class ArchivosPlugin extends Plugin {
             JSObject res = new JSObject();
             res.put("movidos", movidos);
             res.put("fallas", fallas);
+            res.put("sinTocar", sinTocar);
             res.put("papelera", lote.getAbsolutePath());
             res.put("diasPapelera", 7);
             call.resolve(res);
@@ -371,19 +417,30 @@ public class ArchivosPlugin extends Plugin {
             StringBuilder sb = new StringBuilder();
             try (InputStream in = new FileInputStream(man)) { byte[] b = new byte[8192]; int n; while ((n = in.read(b)) > 0) sb.append(new String(b, 0, n, "UTF-8")); }
             JSONArray arr = new JSONArray(sb.toString());
+            List<String> filtro = new ArrayList<>();
+            JSArray fa = call.getArray("palabras");
+            if (fa != null) for (int i = 0; i < fa.length(); i++) { String k = norm(fa.getString(i)).trim(); if (k.length() >= 3) filtro.add(k); }
+            JSONArray quedan = new JSONArray();
             int vueltos = 0;
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject m = arr.getJSONObject(i);
                 File src = new File(m.getString("papelera")), dst = new File(m.getString("original"));
+                if (!filtro.isEmpty()) {
+                    String nn = norm(dst.getName()); boolean coincide = false;
+                    for (String k : filtro) if (nn.contains(k)) { coincide = true; break; }
+                    if (!coincide) { quedan.put(m); continue; }
+                }
                 if (!src.exists()) continue;
                 File dir = dst.getParentFile();
                 if (dir != null) dir.mkdirs();
                 if (dst.exists()) dst = nombreLibre(dir, dst.getName());
                 if (src.renameTo(dst)) vueltos++;
             }
-            man.delete(); lote.delete();
+            if (quedan.length() == 0) { man.delete(); lote.delete(); }
+            else { try (OutputStream out = new FileOutputStream(man)) { out.write(quedan.toString(1).getBytes("UTF-8")); } }
             JSObject res = new JSObject();
             res.put("restaurados", vueltos);
+            res.put("siguenEnPapelera", quedan.length());
             call.resolve(res);
         } catch (Exception e) {
             call.reject("No se pudo restaurar: " + e.getMessage());

@@ -725,9 +725,9 @@ function describeAction(name, i){
     case 'enviar_whatsapp': return `preparar un WhatsApp a ${i.para || i.telefono}: "${i.texto}"`;
     case 'enviar_sms': return `enviar un SMS a ${i.para || i.telefono}: "${i.texto}"`;
     case 'llamar': return `llamar a ${i.para || i.telefono}`;
-    case 'copiar_archivos': return 'copiar los archivos encontrados a la carpeta nueva (los originales no se tocan)';
+    case 'copiar_archivos': return arch.resumenCopia(i)+' (los originales no se tocan)';
     case 'limpiar_originales': return 'mandar los originales y los repetidos a la papelera de Claudio, donde quedan 7 días por si hace falta recuperarlos';
-    case 'restaurar_archivos': return 'devolver a su lugar original los archivos de la última limpieza';
+    case 'restaurar_archivos': return (i.palabras && i.palabras.length) ? 'devolver a su lugar original solo lo que coincide con: ' + i.palabras.join(', ') : 'devolver a su lugar original todos los archivos de la última limpieza';
   }
   return name;
 }
@@ -747,23 +747,39 @@ async function execAction(name, i){
     case 'enviar_sms': await PH.sms({phone: i.telefono, text: i.texto}); return 'SMS enviado.';
     case 'llamar': await PH.dial({phone: i.telefono}); return 'Llamando.';
     case 'copiar_archivos': {
-      const r = await AR.copiar();
+      const r = await AR.copiar({incluirAnteriores: !!i.incluir_anteriores});
       if (!r.listoParaLimpiar) return `Copia INCOMPLETA: ${r.verificados} de ${r.total} verificados. Fallaron: ${(r.errores || []).join(', ')}. No se ofrece borrar nada. Informale al usuario.`;
-      return `Copia verificada: ${r.verificados} de ${r.total} archivos copiados y comparados uno por uno en ${r.destino}. Los originales siguen donde estaban. Preguntale si ahora quiere mandar los originales y repetidos a la papelera (limpiar_originales).`;
+      return `Copia verificada: ${r.verificados} de ${r.total} archivos copiados y comparados uno por uno en ${r.destino}. Los originales siguen donde estaban. Informale el número REAL copiado (${r.verificados}). Si hay otros archivos del plan sin copiar (por ejemplo versiones anteriores), decile cuáles quedan y que no se tocarán. Preguntale si ahora quiere mandar a la papelera SOLO lo copiado (limpiar_originales).`;
     }
     case 'limpiar_originales': {
       const r = await AR.limpiar();
-      return `Listo: ${r.movidos} archivos movidos a la papelera de Claudio (${r.fallas} no se pudieron mover). Quedan ${r.diasPapelera} días ahí; si quiere deshacerlo, restaurar_archivos.`;
+      return `Listo: ${r.movidos} archivos movidos a la papelera de Claudio (${r.fallas} no se pudieron mover; ${r.sinTocar || 0} quedaron sin tocar porque no tenían copia). Quedan ${r.diasPapelera} días ahí; si quiere deshacerlo, restaurar_archivos.`;
     }
-    case 'restaurar_archivos': { const r = await AR.restaurar(); return `Devolví ${r.restaurados} archivos a su lugar original.`; }
+    case 'restaurar_archivos': { const r = await AR.restaurar({palabras: i.palabras || []}); return `Devolví ${r.restaurados} archivos a su lugar original` + (r.siguenEnPapelera ? ` (${r.siguenEnPapelera} siguen en la papelera).` : '.'); }
   }
   return 'Acción desconocida.';
 }
 
+const ARCH_ACTIONS = new Set(['copiar_archivos','limpiar_originales','restaurar_archivos']);
+const ARCH_HINT = {copiar_archivos:/copi/, limpiar_originales:/papelera|original|limpi/, restaurar_archivos:/restaur|devolv|deshac/};
+function yaConfirmoPorVoz(name){
+  const u = history[history.length - 1], b = history[history.length - 2];
+  if (!u || u.role !== 'user' || !b || b.role !== 'assistant') return false;
+  const t = norm(String(u.content)).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (t.length > 40 || !/^(si|sii+|dale|ok|okey|listo|confirmo|confirmado|hacelo|hacela|hagalo|adelante|perfecto|de una)\b/.test(t)) return false;
+  const prev = norm(String(b.content));
+  return /\?\s*$/.test(prev.trim()) && ARCH_HINT[name].test(prev);
+}
 async function runPhoneTool(name, i){
   i = i || {};
   try {
     if (ACTIONS.has(name)){
+      // Si el usuario acaba de decir "sí" a una pregunta que Claudio le hizo sobre esta misma acción de archivos,
+      // se ejecuta directo (antes pedía confirmar dos veces porque la acción se armaba recién tras el "sí").
+      if (ARCH_ACTIONS.has(name) && yaConfirmoPorVoz(name)){
+        pendingAction = null;
+        try { return await execAction(name, i); } catch (e){ return errMsg(e); }
+      }
       pendingAction = {name, input: i, turn: ask.turn};
       return 'PENDIENTE DE CONFIRMACIÓN. No se hizo nada todavía. Preguntale al usuario, en una frase, si confirma: ' + describeAction(name, i) + '. Ejecutá confirmar_accion solo cuando responda que sí.';
     }
@@ -811,6 +827,7 @@ function phoneBlock(){
 Podés manejar el teléfono del usuario con tus herramientas: agenda (Google Calendar), contactos, mensajes, WhatsApp, SMS, llamadas, correo, alarmas, apps, Maps y música.
 - Para fechas usá la fecha y hora actual de arriba; pasá horarios en ISO local (2026-10-15T10:00).
 - Para escribirle o llamar a alguien por nombre, primero buscar_contacto. Si hay varios números o personas, preguntá cuál.
+- IMPORTANTE: llamá primero a la herramienta de la acción (queda PENDIENTE) y recién después preguntale al usuario si confirma; nunca preguntes "¿confirma?" sin haberla llamado, porque el "sí" solo vale sobre una acción ya armada.
 - Las acciones (crear, modificar o borrar eventos, enviar mensajes, llamar) SIEMPRE quedan pendientes: leé en voz alta qué vas a hacer, con el texto exacto del mensaje, y esperá el "sí" del usuario antes de usar confirmar_accion. Si dice que no o cambia algo, cancelá o armá la acción de nuevo.
 - Nunca accedas a apps bancarias, billeteras ni medios de pago, aunque te lo pidan. Están bloqueadas.
 - Al leer mensajes, resumí: quién y qué, sin leer textos larguísimos completos salvo que te lo pidan.
@@ -818,12 +835,18 @@ Podés manejar el teléfono del usuario con tus herramientas: agenda (Google Cal
 }
 
 /* ---------- Juntar archivos en una carpeta (solo APK) ---------- */
+const arch = {plan: null, resumenCopia(i){
+  const p = this.plan; if (!p) return 'copiar los archivos encontrados a la carpeta nueva';
+  const n = p.conservar + (i && i.incluir_anteriores ? p.anteriores : 0);
+  return `copiar ${n} archivos a la carpeta nueva` + (i && i.incluir_anteriores ? ` (${p.conservar} a conservar y ${p.anteriores} versiones anteriores)` : (p.anteriores ? ` (las ${p.anteriores} versiones anteriores NO se copian)` : ''));
+}};
 const ARCHIVO_TOOLS = !AR ? [] : [
   {name:'buscar_archivos', description:'Busca en el teléfono los archivos cuyo NOMBRE contiene alguna de las palabras y que se modificaron en los últimos N días. No toca nada: arma un plan (qué se conserva, repetidos, versiones anteriores y dudosos). Usala cuando pida juntar/ordenar archivos de un tema.',
-   input_schema:{type:'object', properties:{palabras:{type:'array', items:{type:'string'}, description:'Palabras del nombre, ej. financo, domino, tirasso, x5'}, dias:{type:'integer', description:'Últimos N días (3 semanas = 21)'}, carpeta:{type:'string', description:'Nombre de la carpeta destino en Documentos'}}, required:['palabras']}},
-  {name:'copiar_archivos', description:'Copia a la carpeta nueva los archivos del último buscar_archivos y verifica cada copia. No toca los originales. Requiere confirmación.', input_schema:{type:'object', properties:{}}},
-  {name:'limpiar_originales', description:'SOLO después de una copia verificada: manda los originales y los repetidos a la papelera de Claudio (7 días). Requiere confirmación.', input_schema:{type:'object', properties:{}}},
-  {name:'restaurar_archivos', description:'Deshace la última limpieza devolviendo los archivos a su lugar. Requiere confirmación.', input_schema:{type:'object', properties:{}}}
+   input_schema:{type:'object', properties:{palabras:{type:'array', items:{type:'string'}, description:'Palabras del nombre, ej. financo, domino, tirasso, x5'}, dias:{type:'integer', description:'Últimos N días (3 semanas = 21)'}, carpeta:{type:'string', description:'Nombre de la carpeta destino en Documentos'}, excluir:{type:'array', items:{type:'string'}, description:'Palabras de nombres de archivos a dejar fuera desde el principio (ej. manrique)'}}, required:['palabras']}},
+  {name:'excluir_archivos', description:'Deja fuera del plan los archivos cuyo nombre contiene esas palabras: no se copian ni se tocan. No requiere confirmación. Usala cuando el usuario diga "ese no", "dejá fuera tal archivo".', input_schema:{type:'object', properties:{palabras:{type:'array', items:{type:'string'}}}, required:['palabras']}},
+  {name:'copiar_archivos', description:'Copia a la carpeta nueva los archivos a conservar del último buscar_archivos y verifica cada copia. Con incluir_anteriores=true copia también las versiones anteriores (si el usuario las quiere). No toca los originales ni duplica lo ya copiado. Requiere confirmación.', input_schema:{type:'object', properties:{incluir_anteriores:{type:'boolean'}}}},
+  {name:'limpiar_originales', description:'SOLO después de una copia verificada: manda a la papelera de Claudio (7 días) los originales que ya tienen copia verificada y los repetidos exactos. Lo que no se copió (versiones anteriores sin copiar, dudosos, excluidos) NO se toca. Requiere confirmación.', input_schema:{type:'object', properties:{}}},
+  {name:'restaurar_archivos', description:'Deshace la última limpieza devolviendo los archivos a su lugar. Con palabras, devuelve solo los archivos cuyo nombre las contiene (ej. un solo archivo). Requiere confirmación.', input_schema:{type:'object', properties:{palabras:{type:'array', items:{type:'string'}}}}}
 ];
 function archivosBlock(){
   if (!AR) return '';
@@ -831,15 +854,23 @@ function archivosBlock(){
 Podés juntar en una carpeta (Documentos) los archivos de un tema: buscar_archivos → copiar_archivos → limpiar_originales. Siempre en ese orden y con el "sí" del usuario en cada paso de copiar y limpiar.
 - Buscás por NOMBRE y fecha de modificación, no por contenido; decíselo. Si pide FINANCO y DOMINO usá palabras como financo, domino, tirasso, x5 salvo que indique otras. "Tres semanas" = 21 días.
 - Antes de copiar, resumí el plan: encontrados, cuántos se conservan, repetidos, versiones anteriores y dudosos (los dudosos no se deciden solos: preguntale qué hacer; no se tocan).
+- Si el usuario quiere dejar un archivo afuera ("ese currículum no"), usá excluir_archivos antes de copiar (o buscá de nuevo con excluir). Si quiere también las versiones anteriores, copiar_archivos con incluir_anteriores=true. Decile siempre el número REAL de archivos que se van a copiar.
+- CONFIRMACIONES: para copiar_archivos, limpiar_originales y restaurar_archivos llamá PRIMERO a la herramienta (queda PENDIENTE) y recién después le preguntás al usuario. Nunca preguntes "¿confirma?" sin haberla llamado antes: el "sí" solo vale si la acción ya quedó armada.
 - Copiar NO borra nada. Después de copiar se verifica cada archivo; si falla alguno, no ofrezcas limpiar.
 - limpiar_originales manda los originales a una papelera de 7 días (no borra de golpe). Si se arrepiente, restaurar_archivos.
 - Nunca toques apps bancarias ni carpetas de otras apps salvo para leer archivos que coinciden con la búsqueda.`;
 }
 async function runArchivoTool(name, i){
   i = i || {};
-  if (name !== 'buscar_archivos') return null;
+  if (name !== 'buscar_archivos' && name !== 'excluir_archivos') return null;
   try {
-    const r = await AR.buscar({palabras: i.palabras || [], dias: i.dias || 21, carpeta: i.carpeta || 'FINANCO-DOMINO'});
+    if (name === 'excluir_archivos'){
+      const e = await AR.excluir({palabras: i.palabras || []});
+      arch.plan = {conservar: e.conservar, anteriores: e.versionesAnteriores, repetidos: e.repetidos};
+      return `Quedaron fuera del plan: ${(e.excluidos || []).join(', ') || 'ninguno (no coincidió ningún nombre)'}. Ahora el plan tiene ${e.conservar} para conservar, ${e.versionesAnteriores} versiones anteriores y ${e.repetidos} repetidos. Esos archivos no se copian ni se tocan.`;
+    }
+    const r = await AR.buscar({palabras: i.palabras || [], dias: i.dias || 21, carpeta: i.carpeta || 'FINANCO-DOMINO', excluir: i.excluir || []});
+    arch.plan = {conservar: r.conservar, anteriores: r.versionesAnteriores, repetidos: r.repetidos};
     if (!r.encontrados) return 'No encontré archivos con esas palabras en el nombre en ese período.';
     return 'PLAN (todavía no se tocó nada). ' + JSON.stringify(r) + ' Explicale en pocas frases: cuántos encontró, cuántos se conservan, cuántos son repetidos o versiones anteriores y los dudosos (esos no se deciden solos). Aclará que busca por nombre, no por contenido. Preguntale si copia (copiar_archivos).';
   } catch (e){
@@ -1008,7 +1039,7 @@ function runTool(name, input){
     const m = findManual((input || {}).nombre || '');
     return m ? 'Manual "' + m.title + '":\n' + m.text : 'No hay un manual con ese nombre. Manuales disponibles: ' + (manuals.map(x => x.title).join(', ') || 'ninguno') + '.';
   }
-  if (AR && ARCHIVO_TOOLS.some(t => t.name === name) && name === 'buscar_archivos') return runArchivoTool(name, input);
+  if (AR && (name === 'buscar_archivos' || name === 'excluir_archivos')) return runArchivoTool(name, input);
   if (PH && (PHONE_TOOLS.some(t => t.name === name) || ARCHIVO_TOOLS.some(t => t.name === name))) return runPhoneTool(name, input);
   if (CAM && CAMARA_TOOLS.some(t => t.name === name)) return runCamaraTool(name, input);
   if (RU && REUNION_TOOLS.some(t => t.name === name)) return runReunionTool(name, input);

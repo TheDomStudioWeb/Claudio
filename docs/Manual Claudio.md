@@ -132,3 +132,10 @@ Claudio puede sacar fotos y grabar videos **sin abrir la app de cámara**. Todo 
 
 ## La imagen de Claudio
 En pantalla Claudio se muestra con su imagen holográfica animada: el anillo azul gira alrededor de la carita cuando escucha (más rápido) o habla (la carita late con la voz). Al pensar, el anillo se vuelve dorado, gira como una moneda y se convierte en una esfera de alambre con ojos y órbitas doradas girando; en rojo si hubo un error.
+
+## Juntar archivos: novedades (25/10/2026)
+- **Dejar un archivo afuera:** "no copies el currículum de Manrique". Claudio lo saca del plan: no se copia ni se toca.
+- **Copiar también las versiones anteriores:** si lo pedís, copia las versiones viejas además de las últimas. Antes solo copiaba las últimas.
+- **La papelera solo recibe lo que ya está copiado.** Lo que no se copió (versiones anteriores sin copiar, dudosos, excluidos) queda en su lugar.
+- **Deshacer un solo archivo:** "restaurá el currículum": devuelve solo ese a su lugar; el resto sigue en la papelera 7 días.
+- **Confirmaciones:** Claudio deja armada la acción y después te pregunta; con un "sí" alcanza. Si él había preguntado y vos contestás "sí", ya no te pide confirmar dos veces.
