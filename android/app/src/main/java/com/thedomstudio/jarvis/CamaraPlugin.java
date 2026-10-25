@@ -209,7 +209,14 @@ public class CamaraPlugin extends Plugin {
         try { if (provider != null) provider.unbindAll(); } catch (Exception ignored) {}
         sonido(MediaActionSound.STOP_VIDEO_RECORDING);
         PluginCall c = stopCall; stopCall = null;
-        if (c == null) return;
+        if (c == null) {
+            // Corte automático por tiempo: se avisa a la pantalla.
+            JSObject e = new JSObject();
+            e.put("nombre", videoNombre + ".mp4");
+            e.put("segundos", Math.round(fin.getRecordingStats().getRecordedDurationNanos() / 1e9));
+            notifyListeners("videoTerminado", e);
+            return;
+        }
         if (fin.hasError() && fin.getError() != VideoRecordEvent.Finalize.ERROR_NONE
             && fin.getError() != VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED) {
             c.reject("El video terminó con error (" + fin.getError() + ")");

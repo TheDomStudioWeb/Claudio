@@ -54,25 +54,44 @@ body[data-state=listening] .core{animation:breathe .9s ease-in-out infinite}
 body[data-state=speaking] .core{animation:talk .32s ease-in-out infinite alternate}
 body[data-state=speaking] .r4{animation-duration:5s}
 .core-label{font-family:Orbitron;font-size:9px;letter-spacing:.3em;fill:#02121c;font-weight:700}
-/* Imagen de Claudio: hablando/escuchando (anillo) y pensando (esfera) */
+/* Imagen de Claudio animada: anillo + carita (escucha/habla) y esfera con órbitas (piensa) */
 .hud{display:none}
 .orbimg{position:absolute;inset:0;pointer-events:none}
-.orbimg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .55s ease,transform .55s ease,filter .4s;
-  -webkit-mask-image:radial-gradient(circle closest-side,#000 80%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 80%,transparent 100%)}
-.orbimg .oh{opacity:.82;filter:brightness(.82);animation:breathe 4s ease-in-out infinite}
-.orbimg .op{transform:scale(.82);-webkit-mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%);mask-image:radial-gradient(circle closest-side,#000 86%,transparent 100%)}
-.orbimg .or{position:absolute;left:50%;top:50%;width:82%;height:82%;margin:-41% 0 0 -41%;border-radius:50%;border:2px solid rgba(140,235,255,.75);box-shadow:0 0 14px rgba(56,215,255,.8);opacity:0;transition:opacity .5s;transform-style:preserve-3d}
+.orbimg .g{position:absolute;inset:0;transition:opacity .8s ease,transform .9s cubic-bezier(.3,.7,.2,1),filter .8s ease}
+.orbimg img{position:absolute;display:block}
+.orbimg .sp{position:absolute;inset:0}
+.orbimg .sp img{inset:0;width:100%;height:100%}
+.orbimg .s2{transform:scale(.9)}
+.orbimg .s1 .sp-i{animation:spin 18s linear infinite}
+.orbimg .s2 .sp-i{animation:spin 27s linear infinite reverse;opacity:.55}
+.orbimg .sp-i{position:absolute;inset:0}
+.orbimg .cara{left:20%;top:20%;width:60%;height:60%;animation:carita 5s ease-in-out infinite}
+.orbimg .gh{opacity:1;filter:brightness(.85)}
+.orbimg .gp{opacity:0;transform:scale(.45) rotate(-40deg);filter:blur(12px) brightness(1.8)}
+.orbimg .gp .esf{inset:0;width:100%;height:100%;animation:carita 4s ease-in-out infinite}
+.orbimg .or{position:absolute;left:50%;top:50%;width:84%;height:84%;margin:-42% 0 0 -42%;border-radius:50%;border:2px solid rgba(140,235,255,.75);box-shadow:0 0 14px rgba(56,215,255,.8);transform-style:preserve-3d}
 .orbimg .or i{position:absolute;left:50%;top:-6px;width:11px;height:11px;margin-left:-5px;border-radius:50%;background:#e8fdff;box-shadow:0 0 12px 4px #38d7ff}
 @keyframes orbA{from{transform:rotateX(72deg) rotateZ(0)}to{transform:rotateX(72deg) rotateZ(360deg)}}
 @keyframes orbB{from{transform:rotateX(72deg) rotateY(60deg) rotateZ(360deg)}to{transform:rotateX(72deg) rotateY(60deg) rotateZ(0)}}
 @keyframes orbC{from{transform:rotateX(72deg) rotateY(120deg) rotateZ(0)}to{transform:rotateX(72deg) rotateY(120deg) rotateZ(360deg)}}
 .orbimg .o1{animation:orbA 7s linear infinite}.orbimg .o2{animation:orbB 7s linear infinite}.orbimg .o3{animation:orbC 4.5s linear infinite}
-body[data-state=listening] .orbimg .oh{opacity:1;filter:brightness(1.05);animation:breathe .9s ease-in-out infinite}
-body[data-state=speaking] .orbimg .oh{opacity:1;filter:brightness(1.15);animation:talk .32s ease-in-out infinite alternate}
-body[data-state=thinking] .orbimg .oh{opacity:0;animation:none}
-body[data-state=thinking] .orbimg .op{opacity:1;transform:scale(.9);animation:breathe 2.2s ease-in-out infinite}
-body[data-state=thinking] .orbimg .or{opacity:.85}
-body[data-state=error] .orbimg .oh{opacity:1;filter:hue-rotate(150deg) saturate(1.4) brightness(.95)}
+@keyframes carita{0%,100%{transform:translateY(-1.5%) scale(1)}50%{transform:translateY(1.5%) scale(1.035)}}
+@keyframes caritaH{from{transform:scale(.94)}to{transform:scale(1.1)}}
+@keyframes shock{0%{transform:scale(.4);opacity:.9}100%{transform:scale(1.25);opacity:0}}
+.orbimg .shock{position:absolute;left:50%;top:50%;width:78%;height:78%;margin:-39% 0 0 -39%;border-radius:50%;border:3px solid #7fe7ff;box-shadow:0 0 22px #38d7ff,inset 0 0 22px #38d7ff;opacity:0}
+body[data-state=listening] .orbimg .gh{filter:brightness(1.05)}
+body[data-state=listening] .orbimg .s1 .sp-i{animation-duration:8s}
+body[data-state=listening] .orbimg .s2 .sp-i{animation-duration:12s}
+body[data-state=speaking] .orbimg .gh{filter:brightness(1.2)}
+body[data-state=speaking] .orbimg .s1 .sp-i{animation-duration:5s}
+body[data-state=speaking] .orbimg .s2 .sp-i{animation-duration:8s}
+body[data-state=speaking] .orbimg .cara{animation:caritaH .32s ease-in-out infinite alternate}
+body[data-state=thinking] .orbimg .gh{opacity:0;transform:scale(1.55) rotate(50deg);filter:blur(14px) brightness(1.8)}
+body[data-state=thinking] .orbimg .gp{opacity:1;transform:none;filter:brightness(1)}
+body[data-state=thinking] .orbimg .shock{animation:shock 1.1s ease-out both}
+body[data-state=thinking] .orbimg .shock:nth-of-type(2){animation-delay:.18s}
+body[data-state=thinking] .orbimg .shock:nth-of-type(3){animation-delay:.36s}
+body[data-state=error] .orbimg .gh{filter:hue-rotate(150deg) saturate(1.4) brightness(.95)}
 
 .caption{width:100%;max-width:620px;flex:1;min-height:0;overflow-y:auto;padding:14px 4px 8px;text-align:center;
   mask-image:linear-gradient(transparent,#000 14px,#000 calc(100% - 14px),transparent)}
@@ -205,7 +224,11 @@ html.desk.mini .core-hit, html.desk.mini .expand{display:grid}
       <circle class="core" cx="150" cy="150" r="52"/>
       <text class="core-label" id="coreLabel" x="150" y="153" text-anchor="middle">CLAUDIO</text>
     </svg>
-    <div class="orbimg" aria-hidden="true"><img class="oh" src="orb-habla.webp" alt=""><img class="op" src="orb-piensa.webp" alt=""><div class="or o1"><i></i></div><div class="or o2"><i></i></div><div class="or o3"><i></i></div></div>
+    <div class="orbimg" aria-hidden="true">
+      <div class="g gh"><div class="sp s1"><div class="sp-i"><img src="orb-anillo.webp" alt="" style="inset:0;width:100%;height:100%"></div></div><div class="sp s2"><div class="sp-i"><img src="orb-anillo.webp" alt="" style="inset:0;width:100%;height:100%"></div></div><img class="cara" src="orb-cara.webp" alt=""></div>
+      <div class="g gp"><img class="esf" src="orb-esfera.webp" alt=""><div class="or o1"><i></i></div><div class="or o2"><i></i></div><div class="or o3"><i></i></div></div>
+      <div class="shock"></div><div class="shock"></div><div class="shock"></div>
+    </div>
     <div class="core-hit" id="coreHit" title="Hablar (Ctrl+Mayús+Espacio)"></div>
     <button class="expand" id="btnExpand" title="Abrir panel" aria-label="Abrir panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg></button>
   </div>
@@ -362,6 +385,7 @@ const PH = NATIVE ? CAP.registerPlugin('Phone') : null;
 const RU = NATIVE ? CAP.registerPlugin('Reunion') : null;
 const AR = NATIVE ? CAP.registerPlugin('Archivos') : null;
 const CAM = NATIVE ? CAP.registerPlugin('Camara') : null;
+var videoOn = false;
 let reunionOn = false;        // mientras graba una reunión, Claudio no escucha ni habla
 let pendingReunion = null;    // reunión pedida por voz: arranca cuando Claudio termina de responder
 const DESK = (!NATIVE && window.claudioDesktop) || null; // app de escritorio (Windows)
@@ -436,7 +460,7 @@ function clean(t){
 }
 function speak(text){
   text = clean(text);
-  if (reunionOn) return;
+  if (reunionOn || videoOn) return;   // grabando video: Claudio no habla, para que no quede en la grabación
   if (!text || (!NATIVE && !synth)) return;
   const g = gen, v = pickVoice();
   let fired = false;
@@ -806,9 +830,13 @@ Podés sacar fotos (sacar_foto) y grabar videos (iniciar_video / detener_video) 
 - Ejecutalo directamente cuando lo pida; después confirmale en una frase corta. No describas la imagen: no la ves.
 - Suena el obturador y Android muestra su indicador de cámara: nunca lo ocultes ni digas que es silencioso.
 - Solo funciona con Claudio abierto en pantalla. Si falta el permiso de cámara, se le pide y que lo repita.
-- Mientras grabás video no escuchás tu nombre: para terminar, el usuario toca el círculo y dice "detener video".`;
+- VIDEO: al pedírtelo, llamá iniciar_video SIN escribir texto antes ni después (tu voz quedaría grabada). Mientras graba no hablás ni escuchás tu nombre; si pide un tiempo ("de 30 segundos") usá max_segundos y se corta solo. Para terminar antes, el usuario toca el círculo y dice "detener video"; recién ahí volvés a hablar.`;
 }
-var videoOn = false;
+if (CAM) CAM.addListener('videoTerminado', r => {
+  videoOn = false;
+  try { cfg.wake && WK.resume(); } catch {}
+  speak(`Listo, el video quedó guardado: ${r.segundos} segundos.`);
+});
 async function runCamaraTool(name, i){
   i = i || {};
   try {
@@ -820,9 +848,11 @@ async function runCamaraTool(name, i){
     }
     if (name === 'iniciar_video'){
       try { await WK.pause(); } catch {}
-      const r = await CAM.iniciarVideo({camara: i.camara === 'frontal' ? 'frontal' : 'trasera', maxSegundos: i.max_segundos || 600});
-      videoOn = true;
-      return `Grabando video (${r.nombre}). Avisale en una frase que empezó y que para terminar toque el círculo y diga "detener video".`;
+      videoOn = true;                                  // desde ya: ni una palabra más
+      try { await NTTS.stop(); } catch {}
+      await new Promise(r => setTimeout(r, 400));
+      let r; try { r = await CAM.iniciarVideo({camara: i.camara === 'frontal' ? 'frontal' : 'trasera', maxSegundos: i.max_segundos || 600}); } catch (e){ videoOn = false; try { cfg.wake && WK.resume(); } catch {} throw e; }
+      return 'Grabando video. NO DIGAS NADA: no hables mientras se graba, respondé únicamente con un punto (.).';
     }
     if (name === 'detener_video'){
       const r = await CAM.detenerVideo();

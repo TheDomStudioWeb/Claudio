@@ -122,6 +122,8 @@ Claudio puede juntar en una carpeta los archivos de un tema (por ejemplo FINANCO
 Claudio puede sacar fotos y grabar videos **sin abrir la app de cámara**. Todo queda en la galería, en la carpeta **Claudio** (fotos en Pictures/Claudio, videos en Movies/Claudio).
 - **Foto:** "Claudio, sacame una foto", "una selfie", "una foto en 5 segundos", "con flash". Por defecto usa la cámara trasera; "selfie" o "de frente" usa la frontal.
 - **Video:** "Claudio, grabá un video". Para terminar: tocar el círculo y decir "detener video". Corta solo a los 10 minutos si se olvida.
+- **Video con tiempo:** "grabá un video de 30 segundos": se corta solo y Claudio avisa al terminar.
+- **Mientras graba, Claudio no habla** (para que su voz no quede en el video): ni antes ni después de empezar. Recién habla al terminar.
 - La primera vez Android pide permiso de cámara (y micrófono para el sonido del video); después hay que repetir el pedido.
 - **Siempre suena el obturador y Android muestra el indicador de cámara en uso**; Claudio no lo oculta.
 - **Claudio tiene que estar abierto en pantalla.** Android no deja usar la cámara desde segundo plano ni con la pantalla apagada.
@@ -129,4 +131,4 @@ Claudio puede sacar fotos y grabar videos **sin abrir la app de cámara**. Todo 
 - Claudio no ve las fotos: confirma que las sacó, pero no las describe.
 
 ## La imagen de Claudio
-En pantalla Claudio se muestra con su imagen holográfica: el anillo azul con la carita cuando escucha o habla, la esfera con órbitas cuando piensa, y en rojo si hubo un error.
+En pantalla Claudio se muestra con su imagen holográfica animada: el anillo azul gira alrededor de la carita cuando escucha (más rápido) o habla (la carita late con la voz). Al pensar, el anillo se abre con ondas y se transforma en la esfera con órbitas que giran; en rojo si hubo un error.
