@@ -80,6 +80,7 @@ Para que la escucha del nombre no se duerma: Ajustes → Apps → Claudio → Ba
 
 ### Que no se active con cualquier charla (Windows y teléfono)
 - **Después de responder, en el teléfono** Claudio sigue escuchando sin límite de repreguntas (conversación continua real). La charla sigue hasta que se diga «gracias», «chau», «listo» o «deja de escuchar», o se toque el círculo; si pasa cerca de un minuto sin que nadie hable, también se cierra y vuelve a esperar su nombre.
+- **Apagar y volver a encender la escucha por nombre, con la voz:** «Claudio, dejá de escuchar» (también «no me escuches», «apagá la escucha») apaga la activación por nombre; para volver a prenderla, tocar el círculo y decir «**reactivá la escucha por nombre**» (también «activá la escucha», «volvé a escuchar mi nombre»). Es lo mismo que la opción de Protocolos.
 - **En Windows** escucha como máximo **2 repreguntas seguidas**, con una ventana corta (5 segundos), para no engancharse con cualquier conversación de fondo.
 - **Cerrar la charla:** decirle «gracias», «listo», «chau», «eso es todo» o «silencio» corta la conversación sin respuesta y sin seguir escuchando.
 - **Apagar la escucha por nombre:** decirle «dejá de escuchar» (o «no me escuches»), o desmarcar **Escuchar mi nombre** en el menú del ícono junto al reloj. Para llamarlo después: atajo Ctrl + Mayús + Espacio o tocar el círculo. Se vuelve a activar marcando de nuevo esa opción.

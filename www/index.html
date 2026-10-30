@@ -1322,11 +1322,17 @@ function explainError(msg){
 
 const FIN_RE = /^(gracias|muchas gracias|chau|chao|listo|eso es todo|nada mas|ok|dale|perfecto|bueno|callate|silencio|basta|para)(\s+claudio)?$/;
 const NOESCUCHAR_RE = /(deja(s|r)? de escuchar|no (me )?escuches|apaga(r)? la escucha|pausa la escucha)/;
+const SIESCUCHAR_RE = /((re)?activa(r|me)? (la )?(escucha|activacion)( por (voz|nombre))?|(prende|prendeme|enciende|encende)(r)? la escucha|(vuelve|volve|volver) a escuchar( mi nombre| por nombre)?|escucha(me)? (mi )?nombre|escuchame otra vez)/;
 async function ask(text){
   const nt = norm(text).replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
   if (NOESCUCHAR_RE.test(nt)){ // apagar la escucha por nombre desde la voz
     cfg.wake = false; saveCfg(); stopAll(); followCount = FOLLOW_MAX; if (DESK) vosk.mode = 'off'; if (WK) WK.stop().catch(() => {});
     capUser(''); capBot('Listo, dejo de escuchar mi nombre. Para llamarme use el atajo o toque el círculo.'); toast('Escucha por nombre apagada.', 3500); setState('idle'); notifyWake(); return;
+  }
+  if (SIESCUCHAR_RE.test(nt) && !NOESCUCHAR_RE.test(nt)){ // volver a encender la escucha por nombre desde la voz
+    cfg.wake = true; saveCfg(); try { $('#cWake').checked = true; } catch {}
+    if (DESK) deskMode(document.body.dataset.state); else syncWake(true);
+    capUser(''); capBot('Listo, vuelvo a escuchar mi nombre.'); toast('Escucha por nombre activada.', 3500); setState('idle'); notifyWake(); return;
   }
   if (FIN_RE.test(nt)){ stopAll(); followCount = FOLLOW_MAX; capUser(''); setState('idle'); return; } // cierre de la charla: sin respuesta ni más escucha
   if (!cfg.key){ toast('Primero configure su clave de API en Protocolos.'); openSheet('#cfgSheet'); return; }
