@@ -203,4 +203,76 @@ public class ReunionPlugin extends Plugin {
             call.reject("No pude compartir: " + e.getMessage());
         }
     }
+
+    /** Lee un audio guardado (content:// o file://) y lo devuelve en base64 para mandarlo a la IA. */
+    @PluginMethod
+    public void leerParte(final PluginCall call) {
+        final String u = call.getString("uri", "");
+        new Thread(() -> {
+            try (java.io.InputStream in = getContext().getContentResolver().openInputStream(Uri.parse(u));
+                 java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+                if (in == null) { call.reject("No pude abrir el audio."); return; }
+                byte[] buf = new byte[65536];
+                int n;
+                while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+                JSObject o = new JSObject();
+                o.put("b64", android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP));
+                o.put("bytes", out.size());
+                call.resolve(o);
+            } catch (Exception e) {
+                call.reject("No pude leer el audio: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    /** Guarda un texto (informe, transcripción) en Documentos / Claudio Reuniones y devuelve su uri. */
+    @PluginMethod
+    public void guardarTexto(PluginCall call) {
+        String nombre = call.getString("nombre", "informe.md");
+        String texto = call.getString("texto", "");
+        try {
+            byte[] datos = texto.getBytes("UTF-8");
+            if (Build.VERSION.SDK_INT >= 29) {
+                android.content.ContentValues v = new android.content.ContentValues();
+                v.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, nombre);
+                v.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "text/plain");
+                v.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOCUMENTS + "/Claudio Reuniones");
+                Uri uri = getContext().getContentResolver().insert(android.provider.MediaStore.Files.getContentUri("external"), v);
+                if (uri == null) { call.reject("No pude crear el archivo."); return; }
+                try (java.io.OutputStream os = getContext().getContentResolver().openOutputStream(uri)) { os.write(datos); }
+                JSObject o = new JSObject();
+                o.put("uri", uri.toString());
+                o.put("ruta", "Documentos / Claudio Reuniones / " + nombre);
+                call.resolve(o);
+            } else {
+                java.io.File dir = new java.io.File(getContext().getExternalFilesDir(null), "Claudio Reuniones");
+                dir.mkdirs();
+                java.io.File f = new java.io.File(dir, nombre);
+                try (java.io.FileOutputStream os = new java.io.FileOutputStream(f)) { os.write(datos); }
+                JSObject o = new JSObject();
+                o.put("uri", Uri.fromFile(f).toString());
+                o.put("ruta", f.getAbsolutePath());
+                call.resolve(o);
+            }
+        } catch (Exception e) {
+            call.reject("No pude guardar: " + e.getMessage());
+        }
+    }
+
+    /** Comparte un texto (el informe) por el menú de Android: WhatsApp, correo, Drive… */
+    @PluginMethod
+    public void compartirTexto(PluginCall call) {
+        try {
+            Intent send = new Intent(Intent.ACTION_SEND);
+            send.setType("text/plain");
+            send.putExtra(Intent.EXTRA_SUBJECT, call.getString("titulo", "Informe de reunión"));
+            send.putExtra(Intent.EXTRA_TEXT, call.getString("texto", ""));
+            Intent chooser = Intent.createChooser(send, "Compartir informe");
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(chooser);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("No pude compartir: " + e.getMessage());
+        }
+    }
 }

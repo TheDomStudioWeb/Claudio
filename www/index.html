@@ -309,7 +309,10 @@ html.desk.mini .core-hit, html.desk.mini .expand{display:grid}
   <div class="sec">ÚLTIMA REUNIÓN</div>
   <div id="reuParts"><div class="empty" style="padding:12px 0">Todavía no hay grabaciones.</div></div>
   <div class="btns"><button class="btn ghost" id="reuShare">Compartir audios</button></div>
-  <small style="display:block;color:var(--muted);font-size:13px;margin-top:10px;line-height:1.4">Compartí los audios con Gemini (u otra IA) para transcribirlos con hablantes. Al terminar, el teléfono vuelve a escuchar su nombre. Avisá a las personas que se las está grabando.</small>
+  <div class="sec">INFORME CON IA</div>
+  <div id="reuProc" style="color:var(--muted);font-size:14px;line-height:1.4;margin-bottom:8px">Transcribe los audios con hablantes y arma resumen, decisiones y pendientes. Hace falta la clave de Gemini en Protocolos.</div>
+  <div class="btns"><button class="btn" id="reuProcBtn">Transcribir y resumir</button><button class="btn ghost" id="reuInfoShare" style="display:none">Compartir informe</button></div>
+  <small style="display:block;color:var(--muted);font-size:13px;margin-top:10px;line-height:1.4">Con la clave de Gemini, al terminar Claudio arma solo el informe. Sin clave, compartí los audios con Gemini (u otra IA) para transcribirlos. Al terminar, el teléfono vuelve a escuchar su nombre. Avisá a las personas que se las está grabando.</small>
 </div></div>
 
 <!-- Ajustes -->
@@ -319,6 +322,17 @@ html.desk.mini .core-hit, html.desk.mini .expand{display:grid}
     <label>Clave de API de Anthropic</label>
     <input type="password" id="cKey" placeholder="sk-ant-…">
     <small>Se guarda solo en este dispositivo. Obtenela en <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</small>
+  </div>
+  <div class="field">
+    <label>Clave de API de Gemini (informe de reuniones)</label>
+    <input type="password" id="cGem" placeholder="AIza…">
+    <small>Opcional. Con ella, Claudio transcribe las reuniones (con hablantes) y arma el resumen. Gratis en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Se guarda solo en este dispositivo.</small>
+  </div>
+  <div class="field">
+    <label>Enviar informes a GitHub (opcional)</label>
+    <input type="text" id="cGhRepo" placeholder="TheDomStudioWeb/reuniones" autocapitalize="off">
+    <input type="password" id="cGhTok" placeholder="github_pat_… (permiso Contents: lectura y escritura)" style="margin-top:6px">
+    <small>Repositorio privado donde subir la transcripción y el informe de cada reunión, para revisarlos desde otra computadora o con Claude.</small>
   </div>
   <div class="field">
     <label>Núcleo de IA</label>
@@ -425,7 +439,7 @@ let pendingReunion = null;    // reunión pedida por voz: arranca cuando Claudio
 const DESK = (!NATIVE && window.claudioDesktop) || null; // app de escritorio (Windows)
 if (DESK) document.documentElement.classList.add('desk', 'mini');
 let gen = 0; // se incrementa en cada interrupción para ignorar callbacks viejos
-const DEF = {key:'', model:'claude-sonnet-5-5', aname:'Claudio', owner:'', name:'señor', ctx:'', voice:'', rate:1.05, pitch:.9, converse:true, web:false, wake:false, pvKey:'', sens:.6};
+const DEF = {key:'', model:'claude-sonnet-5-5', aname:'Claudio', owner:'', name:'señor', ctx:'', voice:'', rate:1.05, pitch:.9, converse:true, web:false, wake:false, pvKey:'', sens:.6, gem:'', ghTok:'', ghRepo:''};
 let cfg = DEF;
 try { cfg = {...DEF, ...JSON.parse(localStorage.getItem('jarvis.cfg') || '{}')}; } catch {}
 let history = [];
@@ -917,12 +931,13 @@ async function runCamaraTool(name, i){
 const REUNION_TOOLS = !RU ? [] : [
   {name:'iniciar_reunion', description:'Empieza a grabar una reunión (solo audio, en segundo plano, en archivos de unos 25 minutos) y pasa a modo reunión: dejás de escuchar y de hablar hasta que el usuario termine la grabación desde la notificación o el botón rojo de la app. Usala cuando diga "empezá la reunión", "grabá la reunión", "modo reunión", etc. fuente: "mic" (micrófono, por defecto, para reuniones presenciales) o "sistema" (el audio que suena en el teléfono).',
    input_schema:{type:'object', properties:{fuente:{type:'string', enum:['mic','sistema']}}}},
+  {name:'procesar_reunion', description:'Transcribe con Gemini los audios de la última reunión (con hablantes), arma el informe con resumen, decisiones, definiciones, datos y pendientes, lo guarda en Documentos / Claudio Reuniones y lo sube a GitHub si está configurado. Tarda unos minutos y sigue en segundo plano. Usala cuando diga "procesá la reunión", "armá el informe de la reunión", "transcribí la reunión".', input_schema:{type:'object', properties:{}}},
   {name:'terminar_reunion', description:'Termina la grabación de la reunión en curso y guarda los audios.', input_schema:{type:'object', properties:{}}}
 ];
 function reunionBlock(){
   if (!RU) return '';
   return `\n\nMODO REUNIÓN
-Podés grabar reuniones del usuario con iniciar_reunion (solo audio, en segundo plano). Al empezar, confirmale en una sola frase que grabás y que no vas a escuchar ni hablar hasta que termine la grabación (desde la notificación o el botón rojo). Los audios quedan en Música > Claudio Reuniones, en partes de unos 25 minutos, y el usuario los pasa a Gemini para transcribirlos con hablantes. Si el usuario pide grabar el audio del teléfono, usá fuente "sistema" y avisale que Android va a pedir confirmar y que no se graba video. No grabes si no te lo pidió.`;
+Podés grabar reuniones del usuario con iniciar_reunion (solo audio, en segundo plano). Al empezar, confirmale en una sola frase que grabás y que no vas a escuchar ni hablar hasta que termine la grabación (desde la notificación o el botón rojo). Los audios quedan en Música > Claudio Reuniones, en partes de unos 25 minutos, y se pueden transcribir con procesar_reunion (si cargó la clave de Gemini: arma transcripción con hablantes e informe con resumen, decisiones, definiciones, datos y pendientes; lo guarda en Documentos > Claudio Reuniones y lo sube a GitHub si está configurado; al terminar una reunión arranca solo). Si el usuario pide grabar el audio del teléfono, usá fuente "sistema" y avisale que Android va a pedir confirmar y que no se graba video. No grabes si no te lo pidió.`;
 }
 async function runReunionTool(name, i){
   i = i || {};
@@ -931,6 +946,10 @@ async function runReunionTool(name, i){
       if (reunionOn) return 'Ya hay una reunión en curso.';
       pendingReunion = i.fuente === 'sistema' ? 'sistema' : 'mic';
       return 'Listo: la grabación arranca apenas termines de responder. Confirmale en una frase corta que empieza a grabar y que no vas a escuchar ni hablar hasta que termine la reunión' + (pendingReunion === 'sistema' ? ' (Android va a pedirle una confirmación en pantalla para capturar el audio; no se graba video)' : '') + '.';
+    }
+    if (name === 'procesar_reunion'){
+      if (reunionOn) return 'Todavía hay una reunión grabándose: primero hay que terminarla.';
+      return await procesarReunion(false);
     }
     if (name === 'terminar_reunion'){
       if (!reunionOn) return 'No hay ninguna reunión en curso.';
@@ -1423,12 +1442,12 @@ $('#btnPpl').onclick = () => openSheet('#pplSheet');
 $('#who').onclick = () => { mem.speaker = null; saveMem(); renderWho(); toast('Ahora le hablo a usted, ' + (cfg.name || 'señor') + '.', 2000); };
 
 function fillCfg(){
-  $('#cKey').value = cfg.key; $('#cAName').value = cfg.aname; $('#cOwner').value = cfg.owner; $('#cWake').checked = cfg.wake; $('#cSens').value = cfg.sens; refreshWakeUi(); $('#cModel').value = cfg.model; $('#cName').value = cfg.name; $('#cCtx').value = cfg.ctx;
+  $('#cKey').value = cfg.key; $('#cGem').value = cfg.gem || ''; $('#cGhTok').value = cfg.ghTok || ''; $('#cGhRepo').value = cfg.ghRepo || ''; $('#cAName').value = cfg.aname; $('#cOwner').value = cfg.owner; $('#cWake').checked = cfg.wake; $('#cSens').value = cfg.sens; refreshWakeUi(); $('#cModel').value = cfg.model; $('#cName').value = cfg.name; $('#cCtx').value = cfg.ctx;
   $('#cVoice').value = cfg.voice; $('#cRate').value = cfg.rate; $('#cPitch').value = cfg.pitch;
   $('#cConv').checked = cfg.converse; $('#cWeb').checked = cfg.web; updRanges();
 }
 function readCfg(){
-  cfg = {...cfg, aname: $('#cAName').value.trim() || 'Claudio', owner: $('#cOwner').value.trim(), wake: $('#cWake').checked, sens: +$('#cSens').value, key: $('#cKey').value.trim(), model: $('#cModel').value, name: $('#cName').value.trim() || 'señor',
+  cfg = {...cfg, aname: $('#cAName').value.trim() || 'Claudio', owner: $('#cOwner').value.trim(), wake: $('#cWake').checked, sens: +$('#cSens').value, key: $('#cKey').value.trim(), gem: $('#cGem').value.trim(), ghTok: $('#cGhTok').value.trim(), ghRepo: $('#cGhRepo').value.trim(), model: $('#cModel').value, name: $('#cName').value.trim() || 'señor',
     ctx: $('#cCtx').value.trim(), voice: $('#cVoice').value, rate: +$('#cRate').value, pitch: +$('#cPitch').value,
     converse: $('#cConv').checked, web: $('#cWeb').checked};
 }
@@ -1593,6 +1612,116 @@ async function terminarReunion(){
   setTimeout(reuRefresh, 600);
 }
 
+
+/* ---------- Informe de reunión: transcribe con Gemini, resume y guarda ---------- */
+const GEM_MODEL = 'gemini-2.5-flash';
+let procOn = false, ultimoInforme = '';
+const procLS = () => { try { return JSON.parse(localStorage.getItem('claudio.proc') || '{}'); } catch { return {}; } };
+const procSave = o => { try { localStorage.setItem('claudio.proc', JSON.stringify(o)); } catch {} };
+const procMsg = t => { const e = $('#reuProc'); if (e) e.textContent = t; };
+const pausa = ms => new Promise(z => setTimeout(z, ms));
+function b64utf8(txt){
+  const by = new TextEncoder().encode(txt); let bin = '';
+  for (let i = 0; i < by.length; i += 0x8000) bin += String.fromCharCode.apply(null, by.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+async function gemini(parts, maxTok){
+  const body = {contents:[{role:'user', parts}], generationConfig:{temperature:0.2, maxOutputTokens:maxTok || 32000}};
+  let ultimo = '';
+  for (let k = 0; k < 3; k++){
+    let r;
+    try { r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + GEM_MODEL + ':generateContent', {method:'POST', headers:{'content-type':'application/json','x-goog-api-key':cfg.gem}, body:JSON.stringify(body)}); }
+    catch (e){ ultimo = 'sin conexión'; await pausa(4000 * (k + 1)); continue; }
+    if (r.ok){
+      const j = await r.json(); const c = j.candidates && j.candidates[0];
+      const t = ((c && c.content && c.content.parts) || []).map(x => x.text || '').join('');
+      if (!t) throw new Error('Gemini no devolvió texto' + (c && c.finishReason ? ' (' + c.finishReason + ')' : ''));
+      return t;
+    }
+    const tx = (await r.text()).slice(0, 220);
+    ultimo = r.status + ' ' + tx;
+    if (r.status === 429 || r.status >= 500){ await pausa(5000 * (k + 1)); continue; }
+    const e = new Error('Gemini ' + ultimo); e.status = r.status; throw e;
+  }
+  throw new Error('Gemini: ' + ultimo);
+}
+async function transcribirParte(b64, num, total, previo){
+  const prompt = 'Transcribí este audio completo en español, tal cual se dice, sin resumir ni omitir. Indicá quién habla como "Hablante 1", "Hablante 2", etc. (sin intentar identificar nombres) y poné la marca de tiempo [mm:ss] al comenzar cada intervención, contada desde el inicio de esta parte. Si algo no se entiende, escribí [inaudible]; no inventes.'
+    + ' Es la parte ' + num + ' de ' + total + ' de la misma reunión.'
+    + (previo ? ' Mantené la numeración de hablantes de la parte anterior. Final de la parte anterior, para dar contexto (no lo repitas):\n' + previo.slice(-1500) : '');
+  let err;
+  for (const mime of ['audio/mp4', 'audio/aac']){
+    try { return await gemini([{text:prompt}, {inline_data:{mime_type:mime, data:b64}}], 60000); }
+    catch (e){ err = e; if (e.status !== 400) throw e; }
+  }
+  throw err;
+}
+async function resumirReunion(transcripcion, fecha){
+  const prompt = 'Sos el asistente de Daniel Arancibia (The DOM Studio Web, Mendoza). Abajo está la transcripción de una reunión de ' + (fecha || 'fecha desconocida') + ', con hablantes numerados (no se sabe quién es quién; si el contexto lo permite, decí cuál parece ser Daniel, aclarando que es una suposición). Armá un informe en español rioplatense, en Markdown, con estas secciones y nada más: '
+    + '## Resumen (5 a 8 líneas) · ## Decisiones tomadas (lista) · ## Definiciones y acuerdos (números, porcentajes, plazos, condiciones, nombres oficiales; lista con el valor exacto dicho) · ## Datos y cifras mencionados (lista; marcá con ⚠ lo que se dijo de memoria o con dudas) · ## Pendientes (quién, qué y para cuándo, si se dijo) · ## Dudas o puntos abiertos · ## Puntos de interés (ideas, oportunidades, riesgos, cosas para validar con los propietarios u otros). '
+    + 'Usá solo lo que se dijo: no inventes ni completes. Si una sección no tiene nada, escribí "Nada mencionado". Todo lo referido a comisiones o escalas es información interna: marcala como (interno).\n\nTRANSCRIPCIÓN:\n' + transcripcion;
+  return gemini([{text:prompt}], 16000);
+}
+async function ghPut(ruta, texto){
+  const [owner, repo] = (cfg.ghRepo || '').split('/');
+  const url = 'https://api.github.com/repos/' + owner + '/' + repo + '/contents/' + ruta.split('/').map(encodeURIComponent).join('/');
+  const h = {'Authorization':'Bearer ' + cfg.ghTok, 'Accept':'application/vnd.github+json', 'content-type':'application/json'};
+  let sha;
+  try { const g = await fetch(url, {headers:h}); if (g.ok) sha = (await g.json()).sha; } catch {}
+  const r = await fetch(url, {method:'PUT', headers:h, body:JSON.stringify({message:'Reunión: ' + ruta, content:b64utf8(texto), sha})});
+  if (!r.ok) throw new Error('GitHub ' + r.status);
+}
+async function procesarReunion(manual){
+  if (!RU) return 'Esto solo funciona en la app del teléfono.';
+  if (!cfg.gem){ if (manual) toast('Falta la clave de Gemini en Protocolos.', 4000); return 'Falta cargar la clave de Gemini en Protocolos para armar el informe.'; }
+  if (procOn) return 'Ya estoy procesando la reunión.';
+  const st = await RU.estado().catch(() => null);
+  const partes = (st && st.partes) || [];
+  if (!partes.length) return 'No hay una reunión grabada para procesar.';
+  procOn = true;
+  (async () => {
+    const base = (partes[0].nombre || 'Reunion').replace(/_parte\d+.*$/i, '').replace(/\.[^.]+$/, '');
+    const fecha = (base.match(/(\d{4})-(\d{2})-(\d{2})/) || []).slice(1).reverse().join('/');
+    let ls = procLS(); if (ls.base !== base) ls = {base, trans:{}};
+    try {
+      const textos = [];
+      for (let i = 0; i < partes.length; i++){
+        const x = partes[i];
+        if (ls.trans[x.nombre]){ textos.push(ls.trans[x.nombre]); continue; }
+        procMsg('Transcribiendo la parte ' + (i + 1) + ' de ' + partes.length + '… (dejá Claudio abierto; tarda unos minutos)');
+        const a = await RU.leerParte({uri:x.uri});
+        if (a.b64.length > 19e6) throw new Error('La parte ' + (i + 1) + ' es demasiado larga para enviarla (más de unos 35 minutos). Grabá con cortes de 25 minutos.');
+        const t = await transcribirParte(a.b64, i + 1, partes.length, textos.join('\n'));
+        ls.trans[x.nombre] = t; procSave(ls); textos.push(t);
+      }
+      const trans = textos.map((t, i) => (partes.length > 1 ? '### Parte ' + (i + 1) + '\n\n' : '') + t.trim()).join('\n\n');
+      procMsg('Armando el resumen, las decisiones y los pendientes…');
+      const informe = await resumirReunion(trans, fecha);
+      const titulo = '# Reunión del ' + (fecha || base) + '\n\n';
+      const docInforme = titulo + informe.trim() + '\n\n---\nTranscripción completa en el archivo ' + base + '_transcripcion.md\n';
+      const docTrans = titulo + '## Transcripción\n\n' + trans + '\n';
+      ultimoInforme = docInforme;
+      let donde = '';
+      try { const a = await RU.guardarTexto({nombre:base + '_informe.md', texto:docInforme}); await RU.guardarTexto({nombre:base + '_transcripcion.md', texto:docTrans}); donde = a.ruta; }
+      catch (e){ donde = ''; }
+      let gh = '';
+      if (cfg.ghTok && /^[^/]+\/[^/]+$/.test(cfg.ghRepo || '')){
+        try { await ghPut('reuniones/' + base + '/informe.md', docInforme); await ghPut('reuniones/' + base + '/transcripcion.md', docTrans); gh = ' y subido a GitHub'; }
+        catch (e){ gh = ' (no pude subirlo a GitHub: ' + ((e && e.message) || e) + ')'; }
+      }
+      procSave({}); 
+      procMsg('Informe listo' + (donde ? ': ' + donde : '') + gh + '.');
+      $('#reuInfoShare').style.display = '';
+      capBot('Informe de la reunión listo' + (donde ? ' en ' + donde : '') + gh + '. Podés compartirlo desde el botón de reunión.');
+      if (!document.hidden) speak('El informe de la reunión está listo.');
+    } catch (e){
+      procMsg('No pude terminar el informe: ' + ((e && e.message) || e) + '. Lo transcripto hasta ahora queda guardado: tocá de nuevo "Transcribir y resumir" para seguir.');
+      toast('Informe de reunión: ' + ((e && e.message) || e), 6000);
+    } finally { procOn = false; }
+  })();
+  return 'Listo: empiezo a transcribir y armar el informe. Tarda unos minutos y sigue solo; avisame si querés que te lo lea o compartirlo.';
+}
+
 if (RU){
   $('#btnReu').style.display = '';
   $('#btnReu').onclick = () => { $('#reuChunk').value = reuLS.chunk || 25; if (reuLS.fuente) $('#reuFuente').value = reuLS.fuente; reuRefresh(); openSheet('#reuSheet'); reuStartPoll(); };
@@ -1600,6 +1729,8 @@ if (RU){
   $('#reuStop').onclick = terminarReunion;
   $('#reuBanStop').onclick = terminarReunion;
   $('#reuBanner').onclick = e => { if (e.target.id !== 'reuBanStop'){ reuRefresh(); openSheet('#reuSheet'); } };
+  $('#reuProcBtn').onclick = async () => { const r = await procesarReunion(true); if (!procOn) procMsg(r); };
+  $('#reuInfoShare').onclick = () => RU.compartirTexto({titulo:'Informe de reunión', texto:ultimoInforme}).catch(e => toast((e && e.message) || 'No pude compartir.', 3500));
   $('#reuShare').onclick = () => RU.compartir().catch(e => toast((e && e.message) || 'No hay audios para compartir.', 3500));
   $('#reuFuente').onchange = () => {
     $('#reuFuenteHint').textContent = $('#reuFuente').value === 'sistema'
@@ -1616,6 +1747,7 @@ if (RU){
       capBot('Reunión guardada: ' + ev.texto + ' en Música > Claudio Reuniones. Podés compartirlos desde el botón de reunión.');
       if (!document.hidden) speak('Reunión guardada.');
       if (WK && cfg.wake) setTimeout(() => WK.resume().catch(() => {}), 1200);
+      if (cfg.gem) setTimeout(() => procesarReunion(false).then(r => procMsg(procOn ? 'Empezando el informe…' : r)), 2500);
     }
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) reuRefresh(); });

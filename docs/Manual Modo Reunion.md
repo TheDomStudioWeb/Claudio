@@ -5,7 +5,7 @@ El **Modo reunión** graba el audio de una reunión en segundo plano, sin video 
 ## Qué hace y qué no hace
 
 - **Hace:** graba el micrófono (reuniones presenciales) o el audio que suena en el teléfono, y guarda archivos M4A (AAC) de unos 25 minutos cada uno en **Música > Claudio Reuniones**. Un archivo de 25 minutos pesa unos 9 MB.
-- **No transcribe por sí solo.** La transcripción con hablantes (Hablante 1, 2, 3…) se hace pasando los audios a Gemini, a mano.
+- **Informe con IA (opcional).** Si en Protocolos se carga la clave de Gemini, al terminar la reunión Claudio transcribe los audios con hablantes (Hablante 1, 2, 3…) y arma un informe con resumen, decisiones, definiciones y acuerdos, datos y cifras, pendientes, dudas y puntos de interés. Lo guarda en **Documentos / Claudio Reuniones** (informe y transcripción, en archivos .md) y, si se configura un repositorio privado de GitHub y su token, también lo sube a la carpeta `reuniones/`. También se puede pedir por voz: «Claudio, procesá la reunión». Tarda unos minutos (conviene dejar Claudio abierto) y, si se corta, al tocar **Transcribir y resumir** de nuevo sigue desde donde quedó. Sin clave, la transcripción se hace pasando los audios a Gemini a mano, como antes.
 - **No graba llamadas ni videollamadas.** Android impide que una app grabe la voz de la otra persona en una llamada o en Meet, Zoom o WhatsApp.
 - Mientras graba, **Claudio no escucha su nombre ni habla**, para no interrumpir ni cortar la grabación. Al terminar, vuelve a escuchar solo.
 
@@ -49,6 +49,14 @@ Recomendaciones: una parte por vez si Gemini limita la duración; al pegar la si
 - **La barra de nivel no se mueve con "Audio del teléfono":** la app que reproduce el audio puede bloquear su captura. Probar con el micrófono, acercando el teléfono a la fuente.
 - **Se cortó la grabación:** probablemente Android cerró la app por batería. Desactivar la optimización de batería para Claudio. Solo se pierde la parte en curso; las partes anteriores quedan guardadas.
 - **No aparece la carpeta:** buscar en la app de archivos del teléfono, dentro de **Música**.
+
+## Informe con IA: cómo activarlo
+
+1. Conseguir una clave gratuita en aistudio.google.com/apikey y pegarla en **Protocolos > Clave de API de Gemini**.
+2. (Opcional) Para recibir los informes fuera del teléfono: crear un repositorio privado en GitHub, un token con permiso Contents (lectura y escritura) sobre ese repositorio, y pegar ambos en **Protocolos > Enviar informes a GitHub**.
+3. Grabar la reunión como siempre. Al terminar, Claudio avisa cuando el informe está listo; en el panel de reunión aparece **Compartir informe** para mandarlo por WhatsApp, correo o Drive.
+
+Privacidad: el audio y el texto se envían a Google (Gemini) para transcribir. No usarlo en reuniones donde las personas no hayan aceptado ser grabadas ni con información que no pueda salir del teléfono.
 
 ## Privacidad
 
