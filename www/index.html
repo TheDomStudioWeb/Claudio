@@ -1651,10 +1651,11 @@ async function gemini(parts, maxTok){
   }
   throw new Error('Gemini: ' + ultimo);
 }
-async function transcribirParte(b64, num, total, previo){
-  const prompt = 'Transcribí este audio completo en español, tal cual se dice, sin resumir ni omitir. Indicá quién habla como "Hablante 1", "Hablante 2", etc. (sin intentar identificar nombres) y poné la marca de tiempo [mm:ss] al comenzar cada intervención, contada desde el inicio de esta parte. Si algo no se entiende, escribí [inaudible]; no inventes.'
+async function transcribirParte(b64, num, total, previo, inicio){
+  const prompt = 'Transcribí este audio completo en español, tal cual se dice, sin resumir ni omitir. Indicá quién habla como "Hablante 1", "Hablante 2", etc. y poné la marca de tiempo [mm:ss] al comenzar cada intervención, contada desde el inicio de esta parte. Si los participantes se presentan por su nombre y podés asociar cada voz con seguridad, escribí "Nombre (Hablante N)"; si no estás seguro, dejá solo "Hablante N". Si algo no se entiende, escribí [inaudible]; no inventes.'
     + ' Es la parte ' + num + ' de ' + total + ' de la misma reunión.'
-    + (previo ? ' Mantené la numeración de hablantes de la parte anterior. Final de la parte anterior, para dar contexto (no lo repitas):\n' + previo.slice(-1500) : '');
+    + (num > 1 && inicio ? ' Las mismas personas hablan en todas las partes: mantené la numeración de hablantes y los nombres que ya se identificaron. Así empezó la reunión (presentaciones y primeras voces; no lo repitas):\n' + inicio.slice(0, 3000) : '')
+    + (previo ? '\n\nFinal de la parte anterior, para dar contexto (no lo repitas):\n' + previo.slice(-2000) : '');
   let err;
   for (const mime of ['audio/mp4', 'audio/aac']){
     try { return await gemini([{text:prompt}, {inline_data:{mime_type:mime, data:b64}}], 60000); }
@@ -1697,7 +1698,7 @@ async function procesarReunion(manual){
         procMsg('Transcribiendo la parte ' + (i + 1) + ' de ' + partes.length + '… (dejá Claudio abierto; tarda unos minutos)');
         const a = await RU.leerParte({uri:x.uri});
         if (a.b64.length > 19e6) throw new Error('La parte ' + (i + 1) + ' es demasiado larga para enviarla (más de unos 35 minutos). Grabá con cortes de 25 minutos.');
-        const t = await transcribirParte(a.b64, i + 1, partes.length, textos.join('\n'));
+        const t = await transcribirParte(a.b64, i + 1, partes.length, textos[textos.length - 1] || '', textos[0] || '');
         ls.trans[x.nombre] = t; procSave(ls); textos.push(t);
       }
       const trans = textos.map((t, i) => (partes.length > 1 ? '### Parte ' + (i + 1) + '\n\n' : '') + t.trim()).join('\n\n');
