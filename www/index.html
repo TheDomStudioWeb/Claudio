@@ -1614,7 +1614,8 @@ async function terminarReunion(){
 
 
 /* ---------- Informe de reunión: transcribe con Gemini, resume y guarda ---------- */
-const GEM_MODEL = 'gemini-2.5-flash';
+const GEM_MODELS = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+let gemOk = ''; try { gemOk = localStorage.getItem('claudio.gemModel') || ''; } catch {}
 let procOn = false, ultimoInforme = '';
 const procLS = () => { try { return JSON.parse(localStorage.getItem('claudio.proc') || '{}'); } catch { return {}; } };
 const procSave = o => { try { localStorage.setItem('claudio.proc', JSON.stringify(o)); } catch {} };
@@ -1627,21 +1628,26 @@ function b64utf8(txt){
 }
 async function gemini(parts, maxTok){
   const body = {contents:[{role:'user', parts}], generationConfig:{temperature:0.2, maxOutputTokens:maxTok || 32000}};
+  const modelos = gemOk ? [gemOk, ...GEM_MODELS.filter(m => m !== gemOk)] : GEM_MODELS;
   let ultimo = '';
-  for (let k = 0; k < 3; k++){
-    let r;
-    try { r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + GEM_MODEL + ':generateContent', {method:'POST', headers:{'content-type':'application/json','x-goog-api-key':cfg.gem}, body:JSON.stringify(body)}); }
-    catch (e){ ultimo = 'sin conexión'; await pausa(4000 * (k + 1)); continue; }
-    if (r.ok){
-      const j = await r.json(); const c = j.candidates && j.candidates[0];
-      const t = ((c && c.content && c.content.parts) || []).map(x => x.text || '').join('');
-      if (!t) throw new Error('Gemini no devolvió texto' + (c && c.finishReason ? ' (' + c.finishReason + ')' : ''));
-      return t;
+  for (const modelo of modelos){
+    for (let k = 0; k < 3; k++){
+      let r;
+      try { r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {method:'POST', headers:{'content-type':'application/json','x-goog-api-key':cfg.gem}, body:JSON.stringify(body)}); }
+      catch (e){ ultimo = 'sin conexión'; await pausa(4000 * (k + 1)); continue; }
+      if (r.ok){
+        const j = await r.json(); const c = j.candidates && j.candidates[0];
+        const t = ((c && c.content && c.content.parts) || []).map(x => x.text || '').join('');
+        if (!t) throw new Error('Gemini no devolvió texto' + (c && c.finishReason ? ' (' + c.finishReason + ')' : ''));
+        gemOk = modelo; try { localStorage.setItem('claudio.gemModel', modelo); } catch {}
+        return t;
+      }
+      const tx = (await r.text()).slice(0, 220);
+      ultimo = modelo + ': ' + r.status + ' ' + tx;
+      if (r.status === 404) break;                       // modelo retirado: probar el siguiente
+      if (r.status === 429 || r.status >= 500){ await pausa(5000 * (k + 1)); continue; }
+      const e = new Error('Gemini ' + ultimo); e.status = r.status; throw e;
     }
-    const tx = (await r.text()).slice(0, 220);
-    ultimo = r.status + ' ' + tx;
-    if (r.status === 429 || r.status >= 500){ await pausa(5000 * (k + 1)); continue; }
-    const e = new Error('Gemini ' + ultimo); e.status = r.status; throw e;
   }
   throw new Error('Gemini: ' + ultimo);
 }
