@@ -37,6 +37,12 @@ public class VozPlugin extends Plugin {
     private final Map<String, Eng> engines = new HashMap<>();
     private final Map<String, PluginCall> pending = new ConcurrentHashMap<>();
     private int seq = 0;
+    private final Map<String, Runnable> watches = new ConcurrentHashMap<>();
+
+    private void cancelWatch(String id) {
+        Runnable r = watches.remove(id);
+        if (r != null) ui.removeCallbacks(r);
+    }
 
     private interface EngCb { void run(Eng e); }
 
@@ -109,14 +115,17 @@ public class VozPlugin extends Plugin {
                     }
                 }, key.isEmpty() ? null : key);
                 ne.tts.setOnUtteranceProgressListener(new UtteranceProgressListener() {
-                    @Override public void onStart(String id) {}
+                    @Override public void onStart(String id) { cancelWatch(id); }
                     @Override public void onDone(String id) {
+                        cancelWatch(id);
                         PluginCall c = pending.remove(id);
                         if (c != null) c.resolve();
                     }
-                    @Override public void onError(String id) {
+                    @Override public void onError(String id) { onError(id, -1); }
+                    @Override public void onError(String id, int code) {
+                        cancelWatch(id);
                         PluginCall c = pending.remove(id);
-                        if (c != null) c.reject("Error al hablar");
+                        if (c != null) c.reject("El motor devolvió error " + code);
                     }
                     @Override public void onStop(String id, boolean interrupted) {
                         PluginCall c = pending.remove(id);
@@ -167,6 +176,9 @@ public class VozPlugin extends Plugin {
                                             if (!language.isEmpty() && !language.equalsIgnoreCase(loc.getLanguage())) continue;
                                             Set<String> feats = v.getFeatures();
                                             boolean installed = feats == null || !feats.contains(TextToSpeech.Engine.KEY_FEATURE_NOT_INSTALLED);
+                                            if (installed) {
+                                                try { installed = e.tts.isLanguageAvailable(loc) >= TextToSpeech.LANG_AVAILABLE; } catch (Exception ignored2) {}
+                                            }
                                             JSObject o = new JSObject();
                                             o.put("engine", pkg);
                                             o.put("engineLabel", label);
@@ -224,12 +236,28 @@ public class VozPlugin extends Plugin {
                             }
                             e.tts.setSpeechRate(rate);
                             e.tts.setPitch(pitch);
-                            String id = "v" + (++seq);
+                            final String id = "v" + (++seq);
+                            final boolean alone = pending.isEmpty();
+                            final Eng fe = e;
                             pending.put(id, call);
+                            if (alone) {
+                                Runnable w = new Runnable() {
+                                    @Override public void run() {
+                                        watches.remove(id);
+                                        PluginCall c = pending.remove(id);
+                                        if (c != null) {
+                                            try { fe.tts.stop(); } catch (Exception ignored) {}
+                                            c.reject("El motor no emitió sonido con esa voz");
+                                        }
+                                    }
+                                };
+                                watches.put(id, w);
+                                ui.postDelayed(w, 6000);
+                            }
                             Bundle b = new Bundle();
                             b.putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume);
                             int res = e.tts.speak(text, queue, b, id);
-                            if (res != TextToSpeech.SUCCESS) { pending.remove(id); call.reject("No se pudo hablar"); }
+                            if (res != TextToSpeech.SUCCESS) { cancelWatch(id); pending.remove(id); call.reject("No se pudo hablar"); }
                         } catch (Exception ex) {
                             call.reject(String.valueOf(ex.getMessage()));
                         }

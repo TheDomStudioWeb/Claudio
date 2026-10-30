@@ -1516,7 +1516,7 @@ if (NATIVE){
     const v = voices.find(x => x.id === $('#cVoice').value);
     const o = {text: 'Hola, soy ' + AN() + '. ¿Le gusta mi voz?', lang: v ? v.lang : 'es-AR', rate: +$('#cRate').value || 1, pitch: +$('#cPitch').value || 1, volume: 1, queue: 0};
     if (v){ o.engine = v.engine; o.voice = v.name; }
-    NVOZ.speak(o).catch(() => toast('No pude reproducir esa voz.', 3000));
+    NVOZ.speak(o).catch(e => toast('Esa voz no suena: ' + ((e && (e.message || e.errorMessage)) || 'sin detalle') + (v ? ' (' + (v.engineLabel || v.engine) + ')' : ''), 6000));
   });
   // Al volver de los ajustes del teléfono (donde se descargan voces), se actualiza la lista.
   document.addEventListener('visibilitychange', () => { if (!document.hidden && vozOk) loadVoices(); });
