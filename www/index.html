@@ -581,8 +581,8 @@ async function listenNative(opts = {}){
     listening = false;
     const t = last.trim();
     if (t) ask(t);
-    else if (opts.follow && !opts.retry && NATIVE && cfg.converse){ // el reconocedor del teléfono a veces se cierra sin oír nada: un segundo intento antes de dar por terminada la charla
-      setTimeout(() => listenNative({follow: true, retry: true}), 700);
+    else if (opts.follow && (opts.retry || 0) < 6 && NATIVE && cfg.converse){ // silencio o reconocedor cerrado sin oír: sigue escuchando (hasta ~1 min sin que nadie hable) en vez de cortar la charla
+      setTimeout(() => listenNative({follow: true, retry: (opts.retry || 0) + 1}), 700);
     } else { followCount = FOLLOW_MAX; capUser(''); setState('idle'); }
   };
   finishListen = () => { WK.stopListen().catch(() => {}); arm(1200); }; // tocar el mic: cerrar y procesar lo dicho
