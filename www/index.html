@@ -483,7 +483,7 @@ let voices = [], pending = 0, streamDone = true, stopped = false, abortCtrl = nu
 
 function fillVoices(){
   const sel = $('#cVoice'); sel.innerHTML = '<option value="">Automática</option>';
-  for (const v of voices){ const o = document.createElement('option'); o.value = v.id; o.textContent = v.name + ' (' + v.lang + ')'; sel.appendChild(o); }
+  for (const v of voices){ const o = document.createElement('option'); o.value = v.id; o.textContent = NATIVE ? v.name + ' · ' + v.id + (v.localService === false ? ' · en línea' : '') : v.name + ' (' + v.lang + ')'; sel.appendChild(o); } // en el teléfono varias voces comparten el mismo nombre de idioma: se agrega su código para distinguirlas
   sel.value = cfg.voice;
 }
 async function loadVoices(){
