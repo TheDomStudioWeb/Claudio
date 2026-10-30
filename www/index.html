@@ -490,14 +490,19 @@ async function loadVoices(){
   if (NATIVE){
     try {
       const {voices: all} = await NTTS.getSupportedVoices();
-      voices = all.map((v, i) => ({...v, id: 'n' + i, idx: i})).filter(v => (v.lang || '').toLowerCase().startsWith('es'));
+      // La clave es el nombre propio de la voz (estable), no su posición: la posición cambia si el teléfono agrega o quita voces y entonces Claudio hablaba con otra.
+      voices = all.map((v, i) => ({...v, id: v.voiceURI || v.name || ('n' + i), idx: i})).filter(v => (v.lang || '').toLowerCase().startsWith('es'));
     } catch { voices = []; }
   } else if (synth){
     voices = synth.getVoices().filter(v => v.lang.toLowerCase().startsWith('es')).map(v => ({id: v.voiceURI, name: v.name, lang: v.lang, raw: v}));
   }
   fillVoices();
 }
-loadVoices();
+let loadVoicesP = null;
+const ensureVoices = () => voices.length ? Promise.resolve() : (loadVoicesP = loadVoicesP || loadVoices().finally(() => { loadVoicesP = null; }));
+loadVoices().then(() => { // el motor de voz del teléfono a veces tarda en arrancar: reintenta para tomar la voz elegida y no la de por defecto
+  let n = 0; const t = setInterval(() => { if (voices.length || ++n > 6) clearInterval(t); else loadVoices(); }, 1500);
+});
 if (!NATIVE && synth) synth.onvoiceschanged = loadVoices;
 
 function pickVoice(){
@@ -523,9 +528,13 @@ function speak(text){
   const wd = setTimeout(done, speak.queueEnd - now + 6000);
   pending++; setState('speaking');
   if (NATIVE){
-    const o = {text, lang: v ? v.lang : 'es-AR', rate: cfg.rate, pitch: cfg.pitch, volume: 1, queueStrategy: 1};
-    if (v) o.voice = v.idx;
-    NTTS.speak(o).catch(() => {}).finally(done);
+    (async () => {
+      try { await ensureVoices(); } catch {}
+      const v2 = pickVoice();
+      const o = {text, lang: v2 ? v2.lang : 'es-AR', rate: cfg.rate, pitch: cfg.pitch, volume: 1, queueStrategy: 1};
+      if (v2) o.voice = v2.idx;
+      NTTS.speak(o).catch(() => {}).finally(done);
+    })();
     return;
   }
   const u = new SpeechSynthesisUtterance(text);
