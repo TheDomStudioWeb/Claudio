@@ -539,6 +539,7 @@ function checkDone(){
   pending = 0;
   if (document.body.dataset.state !== 'error') setState('idle');
   if (pendingReunion){ const f = pendingReunion; pendingReunion = null; stopped = true; setTimeout(() => iniciarReunion(f), 300); return; }
+  if (ask._cierre){ ask._cierre = false; followCount = FOLLOW_MAX; } // se despidió: no volver a escuchar
   if (cfg.converse && !stopped && followCount < FOLLOW_MAX){
     // Conversación acotada: tras responder escucha hasta FOLLOW_MAX repreguntas seguidas (ventana corta);
     // después vuelve a esperar el nombre, para no engancharse con charlas de fondo.
@@ -572,6 +573,7 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, listening = false;
 
 let finishListen = null;
+const SIL_REINT = 2;   // reintentos en silencio con la conversación continua (~10 s cada uno); después Claudio vuelve a esperar su nombre
 async function listenNative(opts = {}){
   if (listening) return;
   listening = true;               // bloquea antes de cualquier espera
@@ -595,8 +597,8 @@ async function listenNative(opts = {}){
     listening = false;
     const t = last.trim();
     if (t) ask(t);
-    else if (opts.follow && (opts.retry || 0) < 6 && NATIVE && cfg.converse){ // silencio o reconocedor cerrado sin oír: sigue escuchando (hasta ~1 min sin que nadie hable) en vez de cortar la charla
-      setTimeout(() => listenNative({follow: true, retry: (opts.retry || 0) + 1}), 700);
+    else if (opts.follow && (opts.retry || 0) < SIL_REINT && NATIVE && cfg.converse){ // silencio: espera un rato más (sin pitido) y después vuelve a esperar su nombre
+      setTimeout(() => listenNative({follow: true, beep: false, retry: (opts.retry || 0) + 1}), 700);
     } else { followCount = FOLLOW_MAX; capUser(''); setState('idle'); }
   };
   finishListen = () => { WK.stopListen().catch(() => {}); arm(1200); }; // tocar el mic: cerrar y procesar lo dicho
@@ -1321,6 +1323,12 @@ function explainError(msg){
 }
 
 const FIN_RE = /^(gracias|muchas gracias|chau|chao|listo|eso es todo|nada mas|ok|dale|perfecto|bueno|callate|silencio|basta|para)(\s+claudio)?$/;
+// Despedida: toda la frase está hecha solo de palabras de cierre y trae al menos una de despedida ("gracias, chau Claudio", "bueno, muchas gracias, hasta luego").
+const CIERRE_VOCAB = new Set('gracias muchas muchisimas mil chau chao adios claudio listo bueno ok okey dale perfecto genial excelente barbaro buenisimo hasta luego nos vemos eso es todo por ahora hoy nada mas callate silencio basta un abrazo cuidate buenas noches tardes dias tu ayuda mejor asi'.split(' '));
+const CIERRE_CLAVE = /\b(gracias|chau|chao|adios|hasta luego|nos vemos|eso es todo|nada mas|callate|silencio|basta)\b/;
+const esCierre = nt => { const w = nt.split(' ').filter(Boolean); return w.length > 0 && w.length <= 10 && CIERRE_CLAVE.test(nt) && w.every(x => CIERRE_VOCAB.has(x)); };
+// Despedida con algo más ("chau Claudio, gracias por lo de hoy"): responde una vez y no vuelve a abrir el micrófono.
+const esDespedidaLarga = nt => nt.split(' ').length <= 12 && /\b(chau|chao|adios|hasta luego|nos vemos|eso es todo|nada mas por hoy)\b/.test(nt);
 const NOESCUCHAR_RE = /(deja(s|r)? de escuchar|no (me )?escuches|apaga(r)? la escucha|pausa la escucha)/;
 const SIESCUCHAR_RE = /((re)?activa(r|me)? (la )?(escucha|activacion)( por (voz|nombre))?|(prende|prendeme|enciende|encende)(r)? la escucha|(vuelve|volve|volver) a escuchar( mi nombre| por nombre)?|escucha(me)? (mi )?nombre|escuchame otra vez)/;
 async function ask(text){
@@ -1334,9 +1342,9 @@ async function ask(text){
     if (DESK) deskMode(document.body.dataset.state); else syncWake(true);
     capUser(''); capBot('Listo, vuelvo a escuchar mi nombre.'); toast('Escucha por nombre activada.', 3500); setState('idle'); notifyWake(); return;
   }
-  if (FIN_RE.test(nt)){ stopAll(); followCount = FOLLOW_MAX; capUser(''); setState('idle'); return; } // cierre de la charla: sin respuesta ni más escucha
+  if (FIN_RE.test(nt) || esCierre(nt)){ stopAll(); followCount = FOLLOW_MAX; capUser(''); setState('idle'); return; } // cierre de la charla: sin respuesta ni más escucha
   if (!cfg.key){ toast('Primero configure su clave de API en Protocolos.'); openSheet('#cfgSheet'); return; }
-  stopAll(); stopped = false;
+  stopAll(); stopped = false; ask._cierre = esDespedidaLarga(nt);
   if (mem.speaker && Date.now() - mem.lastAt > 20 * 60e3){ mem.speaker = null; renderWho(); } // tras 20 min, vuelve a ser usted
   mem.lastAt = Date.now(); saveMem(); ask._retried = false; ask.turn++;
   capUser(text); capBot('');
