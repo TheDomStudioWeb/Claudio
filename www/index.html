@@ -363,6 +363,8 @@ html.desk.mini .core-hit, html.desk.mini .expand{display:grid}
   <div class="field">
     <label>Voz</label>
     <select id="cVoice"></select>
+    <small>Se listan las voces de todos los motores de voz del teléfono. Las marcadas «SIN INSTALAR» primero hay que descargarlas.</small>
+    <button type="button" class="btn" id="cVoiceSet" style="margin-top:6px">Abrir ajustes de voz del teléfono</button>
   </div>
   <div class="row">
     <div class="field"><label>Velocidad <span id="vRate"></span></label><input type="range" id="cRate" min=".7" max="1.5" step=".05"></div>
@@ -428,6 +430,8 @@ const CAP = window.Capacitor;
 const NATIVE = !!(CAP && CAP.isNativePlatform && CAP.isNativePlatform());
 const NSR = NATIVE ? CAP.registerPlugin('SpeechRecognition') : null;
 const NTTS = NATIVE ? CAP.registerPlugin('TextToSpeech') : null;
+const NVOZ = NATIVE ? CAP.registerPlugin('Voz') : null;   // síntesis propia: todos los motores de voz del teléfono y voces realmente instaladas
+let vozOk = !!NVOZ;
 const WK = NATIVE ? CAP.registerPlugin('WakeWord') : null;
 const PH = NATIVE ? CAP.registerPlugin('Phone') : null;
 const RU = NATIVE ? CAP.registerPlugin('Reunion') : null;
@@ -483,11 +487,32 @@ let voices = [], pending = 0, streamDone = true, stopped = false, abortCtrl = nu
 
 function fillVoices(){
   const sel = $('#cVoice'); sel.innerHTML = '<option value="">Automática</option>';
-  for (const v of voices){ const o = document.createElement('option'); o.value = v.id; o.textContent = NATIVE ? v.name + ' · ' + v.id + (v.localService === false ? ' · en línea' : '') : v.name + ' (' + v.lang + ')'; sel.appendChild(o); } // en el teléfono varias voces comparten el mismo nombre de idioma: se agrega su código para distinguirlas
+  if (NATIVE && vozOk){
+    const engs = [...new Set(voices.map(v => v.engine))];
+    for (const e of engs){
+      const g = document.createElement('optgroup'); g.label = (voices.find(v => v.engine === e) || {}).engineLabel || e;
+      for (const v of voices.filter(x => x.engine === e)){
+        const o = document.createElement('option'); o.value = v.id;
+        o.textContent = v.display + ' · ' + v.name + (v.network ? ' · en línea' : '') + (v.installed ? '' : ' · SIN INSTALAR');
+        if (!v.installed) o.disabled = true;
+        g.appendChild(o);
+      }
+      sel.appendChild(g);
+    }
+  } else for (const v of voices){ const o = document.createElement('option'); o.value = v.id; o.textContent = NATIVE ? v.name + ' · ' + v.id + (v.localService === false ? ' · en línea' : '') : v.name + ' (' + v.lang + ')'; sel.appendChild(o); }
   sel.value = cfg.voice;
+  if (sel.value !== cfg.voice) sel.value = '';
 }
 async function loadVoices(){
   if (NATIVE){
+    if (vozOk){
+      try {
+        const r = await NVOZ.voices({language: 'es'});
+        voices = (r.voices || []).map(v => ({...v, id: v.engine + '|' + v.name}))
+          .sort((a, b) => (b.installed - a.installed) || (a.network - b.network) || a.display.localeCompare(b.display) || a.name.localeCompare(b.name));
+        fillVoices(); return;
+      } catch { vozOk = false; }   // plugin no disponible: vuelve al sistema anterior
+    }
     try {
       const {voices: all} = await NTTS.getSupportedVoices();
       // La clave es el nombre propio de la voz (estable), no su posición: la posición cambia si el teléfono agrega o quita voces y entonces Claudio hablaba con otra.
@@ -507,7 +532,8 @@ if (!NATIVE && synth) synth.onvoiceschanged = loadVoices;
 
 function pickVoice(){
   return voices.find(v => v.id === cfg.voice)
-      || voices.find(v => /es[-_](AR|419|US|MX)/i.test(v.lang))
+      || (cfg.voice && voices.find(v => v.name === cfg.voice && v.installed !== false))
+      || voices.find(v => v.installed !== false && /es[-_](AR|419|US|MX)/i.test(v.lang))
       || null;
 }
 function clean(t){
@@ -531,8 +557,14 @@ function speak(text){
     (async () => {
       try { await ensureVoices(); } catch {}
       const v2 = pickVoice();
+      if (vozOk){
+        const o2 = {text, lang: v2 ? v2.lang : 'es-AR', rate: cfg.rate, pitch: cfg.pitch, volume: 1, queue: 1};
+        if (v2){ o2.engine = v2.engine; o2.voice = v2.name; }
+        try { await NVOZ.speak(o2); done(); return; }
+        catch (e){ if (g !== gen){ done(); return; } }   // si falla, intenta con el sistema anterior para no quedar mudo
+      }
       const o = {text, lang: v2 ? v2.lang : 'es-AR', rate: cfg.rate, pitch: cfg.pitch, volume: 1, queueStrategy: 1};
-      if (v2) o.voice = v2.idx;
+      if (v2 && v2.idx !== undefined) o.voice = v2.idx;
       NTTS.speak(o).catch(() => {}).finally(done);
     })();
     return;
@@ -564,7 +596,7 @@ function checkDone(){
 function stopAll(){
   stopped = true; gen++;
   if (abortCtrl) abortCtrl.abort();
-  if (NATIVE) NTTS.stop().catch(() => {});
+  if (NATIVE){ if (vozOk) NVOZ.stop().catch(() => {}); NTTS.stop().catch(() => {}); }
   else if (synth) synth.cancel();
   pending = 0; speak.queueEnd = 0;
 }
@@ -917,7 +949,7 @@ async function runCamaraTool(name, i){
     if (name === 'iniciar_video'){
       try { await WK.pause(); } catch {}
       videoOn = true;                                  // desde ya: ni una palabra más
-      try { await NTTS.stop(); } catch {}
+      try { if (vozOk) await NVOZ.stop(); await NTTS.stop(); } catch {}
       await new Promise(r => setTimeout(r, 400));
       let r; try { r = await CAM.iniciarVideo({camara: i.camara === 'frontal' ? 'frontal' : 'trasera', maxSegundos: i.max_segundos || 600}); } catch (e){ videoOn = false; try { cfg.wake && WK.resume(); } catch {} throw e; }
       return 'Grabando video. NO DIGAS NADA: no hables mientras se graba, respondé únicamente con un punto (.).';
@@ -1476,6 +1508,19 @@ function readCfg(){
 }
 function updRanges(){ $('#vSens').textContent = (+$('#cSens').value).toFixed(2); $('#vRate').textContent = (+$('#cRate').value).toFixed(2); $('#vPitch').textContent = (+$('#cPitch').value).toFixed(2); }
 $('#cRate').oninput = $('#cPitch').oninput = $('#cSens').oninput = updRanges;
+if (NATIVE){
+  $('#cVoiceSet').onclick = () => { if (vozOk) NVOZ.ajustes().catch(() => toast('Abra Ajustes > Sistema > Idioma > Salida de texto a voz.', 5000)); else toast('Abra Ajustes > Sistema > Idioma > Salida de texto a voz.', 5000); };
+  // Al elegir una voz en la lista, se escucha una muestra con los valores de velocidad y tono de la pantalla.
+  $('#cVoice').addEventListener('change', () => {
+    if (!vozOk) return;
+    const v = voices.find(x => x.id === $('#cVoice').value);
+    const o = {text: 'Hola, soy ' + AN() + '. ¿Le gusta mi voz?', lang: v ? v.lang : 'es-AR', rate: +$('#cRate').value || 1, pitch: +$('#cPitch').value || 1, volume: 1, queue: 0};
+    if (v){ o.engine = v.engine; o.voice = v.name; }
+    NVOZ.speak(o).catch(() => toast('No pude reproducir esa voz.', 3000));
+  });
+  // Al volver de los ajustes del teléfono (donde se descargan voces), se actualiza la lista.
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && vozOk) loadVoices(); });
+}
 $('#testVoice').onclick = () => { readCfg(); stopAll(); speak('A su servicio, ' + cfg.name + '. Todos los sistemas operativos.'); };
 $('#clearHist').onclick = () => { history = []; saveHist(); toast('Memoria de conversación borrada.'); };
 $('#saveCfg').onclick = async () => { readCfg(); saveCfg(); applyName(); $('#cfgSheet').classList.remove('open'); toast('Protocolos actualizados.', 2000); if (DESK && vosk.ready){ if (wakeKey() !== vosk.key) makeWakeRec(); deskMode(document.body.dataset.state); } await syncWake(true); };

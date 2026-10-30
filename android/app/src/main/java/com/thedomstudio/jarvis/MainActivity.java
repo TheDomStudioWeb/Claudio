@@ -16,6 +16,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(ReunionPlugin.class);
         registerPlugin(ArchivosPlugin.class);
         registerPlugin(CamaraPlugin.class);
+        registerPlugin(VozPlugin.class);
         super.onCreate(savedInstanceState);
         // Permite que la app aparezca sobre la pantalla de bloqueo al ser llamada por voz.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
