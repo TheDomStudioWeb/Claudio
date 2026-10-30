@@ -461,7 +461,9 @@ function renderLog(){
 
 /* ---------- Voz: salida ---------- */
 const synth = window.speechSynthesis;
-const FOLLOW_MAX = 2; let followCount = 0;
+// Teléfono (Android): conversación continua real, sin tope de repreguntas; se corta con silencio, con una frase de cierre o tocando el círculo.
+// Windows: acotada a 2 repreguntas para no engancharse con charlas de fondo.
+const FOLLOW_MAX = NATIVE ? 1e9 : 2; let followCount = 0;
 function notifyWake(){ try { if (window.claudioDesktop && claudioDesktop.wakeState) claudioDesktop.wakeState(!!cfg.wake); } catch {} }
 let voices = [], pending = 0, streamDone = true, stopped = false, abortCtrl = null;
 
@@ -528,7 +530,11 @@ function checkDone(){
     // después vuelve a esperar el nombre, para no engancharse con charlas de fondo.
     followCount++;
     clearTimeout(setState._r); // la conversación sigue: no reactivar la escucha del nombre
-    setTimeout(() => { if (!stopped && document.body.dataset.state === 'idle') listen({follow: true}); }, 800);
+    // En Android se espera un poco más: el reconocedor del teléfono falla si abre el micrófono pegado al final de la voz.
+    setTimeout(() => {
+      if (!stopped && document.body.dataset.state === 'idle') listen({follow: true});
+      else if (WK && cfg.wake && !listening && !reunionOn && !videoOn) WK.resume().catch(() => {}); // si la charla no sigue, que vuelva a escuchar el nombre
+    }, NATIVE ? 1300 : 800);
   }
 }
 function stopAll(){
@@ -574,7 +580,10 @@ async function listenNative(opts = {}){
     WK.cancelListen().catch(() => {});
     listening = false;
     const t = last.trim();
-    if (t) ask(t); else { followCount = FOLLOW_MAX; capUser(''); setState('idle'); }
+    if (t) ask(t);
+    else if (opts.follow && !opts.retry && NATIVE && cfg.converse){ // el reconocedor del teléfono a veces se cierra sin oír nada: un segundo intento antes de dar por terminada la charla
+      setTimeout(() => listenNative({follow: true, retry: true}), 700);
+    } else { followCount = FOLLOW_MAX; capUser(''); setState('idle'); }
   };
   finishListen = () => { WK.stopListen().catch(() => {}); arm(1200); }; // tocar el mic: cerrar y procesar lo dicho
   try {
