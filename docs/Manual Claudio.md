@@ -120,6 +120,30 @@ Claudio puede juntar en una carpeta los archivos de un tema (por ejemplo FINANCO
 
 **Límites:** no busca dentro del contenido de los archivos, no entra a carpetas privadas de otras apps (Android/data) y nunca toca apps bancarias.
 
+## Clasificador de fotos de X5 (APK)
+
+Claudio puede revisar la galería completa del teléfono (cámara, WhatsApp, ediciones, descargas) y separar las fotos históricas de X5 en carpetas, para armar videos o presentaciones. Se le pide por voz: "Claudio, clasificá las fotos de X5" (para una prueba: "con 100 fotos").
+
+**Primera vez:** necesita el mismo permiso "Acceso a todos los archivos" que "Juntar archivos".
+
+**Qué busca:**
+- **Entregas:** una persona con llaves de vehículo en la mano, o una persona junto a un auto o una moto. Un vehículo solo NO alcanza: las fotos de stock o de catálogo se descartan.
+- **Planes:** una persona con la carpeta de contrato en la mano (generalmente blanca, con el logo de X5) o firmándola.
+- **Revisar logo X5:** se ve el logo de X5 pero no hay entrega ni contrato claros (por ejemplo, el salón). Quedan aparte para que las mires vos.
+- Todo lo demás se descarta: fotos familiares o de grupos sin vehículo, llaves ni carpeta, vehículos solos, paisajes, capturas, memes.
+
+**Cómo trabaja:**
+1. Recorre la galería y salta las repetidas: las idénticas y también las casi idénticas (las que WhatsApp recomprime). No borra nada.
+2. Achica cada foto y la mira con IA (modelo Haiku, con la clave de API cargada en Protocolos). Corre en segundo plano, puede tardar varios minutos y avisa con la voz al terminar. "Claudio, ¿cómo va el clasificador?" cuenta el avance.
+3. **Copia** (no mueve) las fotos a `Imágenes/X5-Historia/Entregas`, `Planes` y `Revisar_logo_X5`, con la fecha al inicio del nombre. Los originales quedan donde estaban.
+4. Guarda `indice.csv` en `X5-Historia` con fecha, categoría, origen y motivo de cada foto, para ordenarlas en una línea de tiempo.
+
+**Costo:** cada foto analizada consume una consulta de IA con imagen (centavos de dólar cada varios cientos de fotos con Haiku). Por eso conviene empezar con la prueba de 100 y recién después pedir toda la galería ("cantidad 0"; Claudio te avisa antes).
+
+**Privacidad:** son fotos de clientes y se envían achicadas a la IA para analizarlas.
+
+**Límites:** puede equivocarse (por ejemplo, tomar por entrega una foto de un cliente con un auto que no es de una entrega); por eso existe la carpeta de revisión y todo se copia sin tocar originales. No lee fotos dentro de carpetas privadas de otras apps (Android/data).
+
 ## Cámara: fotos y videos directos (APK)
 Claudio puede sacar fotos y grabar videos **sin abrir la app de cámara**. Todo queda en la galería, en la carpeta **Claudio** (fotos en Pictures/Claudio, videos en Movies/Claudio).
 - **Foto:** "Claudio, sacame una foto", "una selfie", "una foto en 5 segundos", "con flash". Por defecto usa la cámara trasera; "selfie" o "de frente" usa la frontal.
