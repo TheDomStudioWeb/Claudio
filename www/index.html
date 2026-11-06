@@ -993,14 +993,16 @@ const FOTOS_PROMPT = `Sos el clasificador de fotos del archivo histórico de X5 
 - revisar: se ve el logo de X5 (cartel, pared, carpeta, ropa) pero no se cumple claramente ninguna de las anteriores; por ejemplo fotos del salón o la oficina.
 - descartar: todo lo demás. En especial: vehículos SIN personas (fotos de stock, catálogo o publicidad), fotos familiares o de grupos de gente sin vehículo, llaves ni carpeta; paisajes, comida, mascotas, capturas de pantalla, memes, documentos, productos.
 
-Reglas: un vehículo solo NO alcanza, tiene que haber una persona con él. Una foto de grupo o familiar sin vehículo, llaves ni carpeta es descartar. Si se cumplen entrega y plan a la vez, elegí entrega. Si dudás entre una categoría y descartar, elegí revisar solo si se ve el logo de X5; si no, descartar.`;
+Reglas: un vehículo solo NO alcanza, tiene que haber una persona con él. Una foto de grupo o familiar sin vehículo, llaves ni carpeta es descartar. Si se cumplen entrega y plan a la vez, elegí entrega. Si dudás entre una categoría y descartar, elegí revisar solo si se ve el logo de X5; si no, descartar.
+
+Respondé ÚNICAMENTE con el JSON, sin explicaciones antes ni después, aunque la foto sea confusa o no se vea bien.`;
 let fotosJob = null;
 async function fotoIA(b64){
   for (let intento = 0; intento < 4; intento++){
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method:'POST',
       headers:{'content-type':'application/json','x-api-key':cfg.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({model:'claude-haiku-5-5', max_tokens:200, messages:[{role:'user', content:[
+      body: JSON.stringify({model:'claude-haiku-5-5', max_tokens:400, messages:[{role:'user', content:[
         {type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64}},
         {type:'text', text:FOTOS_PROMPT}
       ]}]})
@@ -1009,9 +1011,18 @@ async function fotoIA(b64){
     if (!res.ok){ let m = res.status + ''; try { m = (await res.json()).error.message; } catch {} throw new Error(m); }
     const j = await res.json();
     const t = (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
-    const m = t.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('respuesta sin JSON');
-    const o = JSON.parse(m[0]);
+    let o = null;
+    const m = t.match(/\{[\s\S]*?\}/);
+    if (m){ try { o = JSON.parse(m[0]); } catch {} }
+    if (!o){                                           // respuesta cortada o con texto alrededor: rescatar la categoría
+      const c = t.match(/"?categoria"?\s*[:=]\s*"?(entrega|plan|revisar|descartar)/i);
+      if (c) o = {categoria: c[1].toLowerCase(), motivo: (t.match(/"?motivo"?\s*[:=]\s*"([^"]{0,80})/) || [])[1] || ''};
+    }
+    if (!o){
+      if (intento < 2) continue;                       // reintento: a veces contesta con texto en vez de JSON
+      throw new Error('sin JSON (' + (j.stop_reason || '?') + '): ' + t.replace(/\s+/g, ' ').slice(0, 140));
+    }
+    o.categoria = String(o.categoria || '').toLowerCase();
     if (!['entrega','plan','revisar','descartar'].includes(o.categoria)) o.categoria = 'revisar';
     return o;
   }
