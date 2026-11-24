@@ -329,6 +329,11 @@ html.desk.mini .core-hit, html.desk.mini .expand{display:grid}
     <small>Opcional. Con ella, Claudio transcribe las reuniones (con hablantes) y arma el resumen. Gratis en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>. Se guarda solo en este dispositivo.</small>
   </div>
   <div class="field">
+    <label>Clave de AssemblyAI (respaldo del informe)</label>
+    <input type="password" id="cAai" placeholder="clave de assemblyai.com" autocapitalize="off">
+    <small>Opcional. Si Gemini está saturado o sin cuota, Claudio transcribe con AssemblyAI (con hablantes) y resume con Claude usando tu clave de Anthropic. Crédito gratis al registrarte en <a href="https://www.assemblyai.com" target="_blank" rel="noopener">assemblyai.com</a>. Se guarda solo en este dispositivo.</small>
+  </div>
+  <div class="field">
     <label>Enviar informes a GitHub (opcional)</label>
     <input type="text" id="cGhRepo" placeholder="TheDomStudioWeb/reuniones" autocapitalize="off">
     <input type="password" id="cGhTok" placeholder="github_pat_… (permiso Contents: lectura y escritura)" style="margin-top:6px">
@@ -444,7 +449,7 @@ let pendingReunion = null;    // reunión pedida por voz: arranca cuando Claudio
 const DESK = (!NATIVE && window.claudioDesktop) || null; // app de escritorio (Windows)
 if (DESK) document.documentElement.classList.add('desk', 'mini');
 let gen = 0; // se incrementa en cada interrupción para ignorar callbacks viejos
-const DEF = {key:'', model:'claude-sonnet-5-5', aname:'Claudio', owner:'', name:'señor', ctx:'', voice:'', rate:1.05, pitch:.9, converse:true, web:false, wake:false, pvKey:'', sens:.6, gem:'', ghTok:'', ghRepo:''};
+const DEF = {key:'', model:'claude-sonnet-5-5', aname:'Claudio', owner:'', name:'señor', ctx:'', voice:'', rate:1.05, pitch:.9, converse:true, web:false, wake:false, pvKey:'', sens:.6, gem:'', aai:'', ghTok:'', ghRepo:''};
 let cfg = DEF;
 try { cfg = {...DEF, ...JSON.parse(localStorage.getItem('jarvis.cfg') || '{}')}; } catch {}
 let history = [];
@@ -1614,12 +1619,12 @@ $('#btnPpl').onclick = () => openSheet('#pplSheet');
 $('#who').onclick = () => { mem.speaker = null; saveMem(); renderWho(); toast('Ahora le hablo a usted, ' + (cfg.name || 'señor') + '.', 2000); };
 
 function fillCfg(){
-  $('#cKey').value = cfg.key; $('#cGem').value = cfg.gem || ''; $('#cGhTok').value = cfg.ghTok || ''; $('#cGhRepo').value = cfg.ghRepo || ''; $('#cAName').value = cfg.aname; $('#cOwner').value = cfg.owner; $('#cWake').checked = cfg.wake; $('#cSens').value = cfg.sens; refreshWakeUi(); $('#cModel').value = cfg.model; $('#cName').value = cfg.name; $('#cCtx').value = cfg.ctx;
+  $('#cKey').value = cfg.key; $('#cGem').value = cfg.gem || ''; $('#cAai').value = cfg.aai || ''; $('#cGhTok').value = cfg.ghTok || ''; $('#cGhRepo').value = cfg.ghRepo || ''; $('#cAName').value = cfg.aname; $('#cOwner').value = cfg.owner; $('#cWake').checked = cfg.wake; $('#cSens').value = cfg.sens; refreshWakeUi(); $('#cModel').value = cfg.model; $('#cName').value = cfg.name; $('#cCtx').value = cfg.ctx;
   $('#cVoice').value = cfg.voice; $('#cRate').value = cfg.rate; $('#cPitch').value = cfg.pitch;
   $('#cConv').checked = cfg.converse; $('#cWeb').checked = cfg.web; updRanges();
 }
 function readCfg(){
-  cfg = {...cfg, aname: $('#cAName').value.trim() || 'Claudio', owner: $('#cOwner').value.trim(), wake: $('#cWake').checked, sens: +$('#cSens').value, key: $('#cKey').value.trim(), gem: $('#cGem').value.trim(), ghTok: $('#cGhTok').value.trim(), ghRepo: $('#cGhRepo').value.trim(), model: $('#cModel').value, name: $('#cName').value.trim() || 'señor',
+  cfg = {...cfg, aname: $('#cAName').value.trim() || 'Claudio', owner: $('#cOwner').value.trim(), wake: $('#cWake').checked, sens: +$('#cSens').value, key: $('#cKey').value.trim(), gem: $('#cGem').value.trim(), aai: $('#cAai').value.trim(), ghTok: $('#cGhTok').value.trim(), ghRepo: $('#cGhRepo').value.trim(), model: $('#cModel').value, name: $('#cName').value.trim() || 'señor',
     ctx: $('#cCtx').value.trim(), voice: $('#cVoice').value, rate: +$('#cRate').value, pitch: +$('#cPitch').value,
     converse: $('#cConv').checked, web: $('#cWeb').checked};
 }
@@ -1812,11 +1817,12 @@ function b64utf8(txt){
   for (let i = 0; i < by.length; i += 0x8000) bin += String.fromCharCode.apply(null, by.subarray(i, i + 0x8000));
   return btoa(bin);
 }
-async function gemini(parts, maxTok){
+async function gemini(parts, maxTok, rapido){
   const body = {contents:[{role:'user', parts}], generationConfig:{temperature:0.2, maxOutputTokens:maxTok || 32000}};
-  const modelos = gemOk ? [gemOk, ...GEM_MODELS.filter(m => m !== gemOk)] : GEM_MODELS;
+  let modelos = gemOk ? [gemOk, ...GEM_MODELS.filter(m => m !== gemOk)] : GEM_MODELS;
+  if (rapido) modelos = modelos.slice(0, 2);            // hay respaldo: no esperar tanto a Gemini
   let ultimo = '', real = ''; const errores = [];      // real = el error que importa (no un 404 de modelo retirado)
-  const ESPERAS = [8000, 20000, 45000, 75000];         // saturación (503) o cuota (429): esperar cada vez más
+  const ESPERAS = rapido ? [8000, 20000] : [8000, 20000, 45000, 75000];   // saturación (503) o cuota (429): esperar cada vez más
   for (const modelo of modelos){
     for (let k = 0; k <= ESPERAS.length; k++){
       let r;
@@ -1853,17 +1859,77 @@ async function transcribirParte(b64, num, total, previo, inicio){
     + (num > 1 && inicio ? ' Las mismas personas hablan en todas las partes: mantené la numeración de hablantes y los nombres que ya se identificaron. Así empezó la reunión (presentaciones y primeras voces; no lo repitas):\n' + inicio.slice(0, 3000) : '')
     + (previo ? '\n\nFinal de la parte anterior, para dar contexto (no lo repitas):\n' + previo.slice(-2000) : '');
   let err;
-  for (const mime of ['audio/mp4', 'audio/aac']){
-    try { return await gemini([{text:prompt}, {inline_data:{mime_type:mime, data:b64}}], 60000); }
-    catch (e){ err = e; if (e.status !== 400) throw e; }
+  if (cfg.gem && !gemCaido){
+    for (const mime of ['audio/mp4', 'audio/aac']){
+      try { return await gemini([{text:prompt}, {inline_data:{mime_type:mime, data:b64}}], 60000, !!cfg.aai); }
+      catch (e){ err = e; if (e.status !== 400) break; }
+    }
+    if (!cfg.aai) throw err;
+    gemCaido = true;                                     // en esta reunión ya no insistir con Gemini
   }
-  throw err;
+  procMsg('Gemini no responde: transcribo la parte ' + num + ' de ' + total + ' con AssemblyAI… (dejá Claudio abierto)');
+  return aaiTranscribir(b64, num);
+}
+
+/* ---------- Respaldo: AssemblyAI transcribe (con hablantes) y Claude resume ---------- */
+let gemCaido = false;
+function b64bytes(b64){
+  const bin = atob(b64), by = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) by[i] = bin.charCodeAt(i);
+  return by;
+}
+async function aaiFetch(url, opt){
+  let r;
+  try { r = await fetch(url, opt); }
+  catch (e){ throw new Error('AssemblyAI: sin conexión o bloqueado (' + ((e && e.message) || e) + ')'); }
+  if (!r.ok){
+    const raw = await r.text(); let tx = raw;
+    try { tx = JSON.parse(raw).error || raw; } catch {}
+    throw new Error('AssemblyAI ' + r.status + ': ' + String(tx).slice(0, 200) + (r.status === 401 ? ' (revisá la clave en Protocolos)' : ''));
+  }
+  return r.json();
+}
+async function aaiTranscribir(b64, num){
+  const h = {'authorization': cfg.aai};
+  const up = await aaiFetch('https://api.assemblyai.com/v2/upload', {method:'POST', headers:{...h, 'content-type':'application/octet-stream'}, body:b64bytes(b64)});
+  const tr = await aaiFetch('https://api.assemblyai.com/v2/transcript', {method:'POST', headers:{...h, 'content-type':'application/json'},
+    body:JSON.stringify({audio_url: up.upload_url, speaker_labels: true, language_code: 'es', punctuate: true, format_text: true})});
+  const t0 = Date.now();
+  for (;;){
+    await pausa(5000);
+    const st = await aaiFetch('https://api.assemblyai.com/v2/transcript/' + tr.id, {headers:h});
+    if (st.status === 'completed'){
+      const us = st.utterances || [];
+      if (!us.length) return st.text || '[sin texto]';
+      const num2 = {}; let n = 0;
+      const mmss = ms => { const s = Math.floor(ms / 1000); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+      return (num > 1 ? '_(Transcripción de respaldo: la numeración de hablantes puede no coincidir con la de otras partes.)_\n\n' : '')
+        + us.map(u => { if (!num2[u.speaker]) num2[u.speaker] = ++n; return '[' + mmss(u.start) + '] Hablante ' + num2[u.speaker] + ': ' + u.text; }).join('\n\n');
+    }
+    if (st.status === 'error') throw new Error('AssemblyAI no pudo transcribir: ' + (st.error || 'sin detalle'));
+    if (Date.now() - t0 > 25 * 60000) throw new Error('AssemblyAI tardó demasiado; probá de nuevo más tarde.');
+    procMsg('AssemblyAI está transcribiendo la parte ' + num + '… (' + Math.round((Date.now() - t0) / 1000) + ' s)');
+  }
+}
+async function claudeTexto(prompt, maxTok){
+  if (!cfg.key) throw new Error('Gemini no responde y falta la clave de Anthropic en Protocolos para resumir con Claude.');
+  const r = await fetch('https://api.anthropic.com/v1/messages', {method:'POST',
+    headers:{'content-type':'application/json','x-api-key':cfg.key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body:JSON.stringify({model:'claude-haiku-5-5', max_tokens:maxTok || 16000, messages:[{role:'user', content:prompt}]})});
+  if (!r.ok){ const tx = (await r.text()).slice(0, 200); throw new Error('Claude ' + r.status + ': ' + tx); }
+  const j = await r.json();
+  return (j.content || []).map(x => x.text || '').join('');
 }
 async function resumirReunion(transcripcion, fecha){
   const prompt = 'Sos el asistente de Daniel Arancibia (The DOM Studio Web, Mendoza). Abajo está la transcripción de una reunión de ' + (fecha || 'fecha desconocida') + ', con hablantes numerados (no se sabe quién es quién; si el contexto lo permite, decí cuál parece ser Daniel, aclarando que es una suposición). Armá un informe en español rioplatense, en Markdown, con estas secciones y nada más: '
     + '## Resumen (5 a 8 líneas) · ## Decisiones tomadas (lista) · ## Definiciones y acuerdos (números, porcentajes, plazos, condiciones, nombres oficiales; lista con el valor exacto dicho) · ## Datos y cifras mencionados (lista; marcá con ⚠ lo que se dijo de memoria o con dudas) · ## Pendientes (quién, qué y para cuándo, si se dijo) · ## Dudas o puntos abiertos · ## Puntos de interés (ideas, oportunidades, riesgos, cosas para validar con los propietarios u otros). '
     + 'Usá solo lo que se dijo: no inventes ni completes. Si una sección no tiene nada, escribí "Nada mencionado". Todo lo referido a comisiones o escalas es información interna: marcala como (interno).\n\nTRANSCRIPCIÓN:\n' + transcripcion;
-  return gemini([{text:prompt}], 16000);
+  if (cfg.gem && !gemCaido){
+    try { return await gemini([{text:prompt}], 16000, !!cfg.key); }
+    catch (e){ if (!cfg.key) throw e; }
+  }
+  procMsg('Armando el resumen con Claude…');
+  return claudeTexto(prompt, 16000);
 }
 async function ghPut(ruta, texto){
   const [owner, repo] = (cfg.ghRepo || '').split('/');
@@ -1876,7 +1942,8 @@ async function ghPut(ruta, texto){
 }
 async function procesarReunion(manual){
   if (!RU) return 'Esto solo funciona en la app del teléfono.';
-  if (!cfg.gem){ if (manual) toast('Falta la clave de Gemini en Protocolos.', 4000); return 'Falta cargar la clave de Gemini en Protocolos para armar el informe.'; }
+  if (!cfg.gem && !cfg.aai){ if (manual) toast('Falta la clave de Gemini o de AssemblyAI en Protocolos.', 4000); return 'Falta cargar la clave de Gemini (o la de AssemblyAI) en Protocolos para armar el informe.'; }
+  gemCaido = false;
   if (procOn) return 'Ya estoy procesando la reunión.';
   const st = await RU.estado().catch(() => null);
   const partes = (st && st.partes) || [];
@@ -1893,7 +1960,7 @@ async function procesarReunion(manual){
         if (ls.trans[x.nombre]){ textos.push(ls.trans[x.nombre]); continue; }
         procMsg('Transcribiendo la parte ' + (i + 1) + ' de ' + partes.length + '… (dejá Claudio abierto; tarda unos minutos)');
         const a = await RU.leerParte({uri:x.uri});
-        if (a.b64.length > 19e6) throw new Error('La parte ' + (i + 1) + ' es demasiado larga para enviarla (más de unos 35 minutos). Grabá con cortes de 25 minutos.');
+        if (a.b64.length > 19e6 && !cfg.aai) throw new Error('La parte ' + (i + 1) + ' es demasiado larga para enviarla (más de unos 35 minutos). Grabá con cortes de 25 minutos.');
         const t = await transcribirParte(a.b64, i + 1, partes.length, textos[textos.length - 1] || '', textos[0] || '');
         ls.trans[x.nombre] = t; procSave(ls); textos.push(t);
       }
@@ -1950,7 +2017,7 @@ if (RU){
       capBot('Reunión guardada: ' + ev.texto + ' en Música > Claudio Reuniones. Podés compartirlos desde el botón de reunión.');
       if (!document.hidden) speak('Reunión guardada.');
       if (WK && cfg.wake) setTimeout(() => WK.resume().catch(() => {}), 1200);
-      if (cfg.gem) setTimeout(() => procesarReunion(false).then(r => procMsg(procOn ? 'Empezando el informe…' : r)), 2500);
+      if (cfg.gem || cfg.aai) setTimeout(() => procesarReunion(false).then(r => procMsg(procOn ? 'Empezando el informe…' : r)), 2500);
     }
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) reuRefresh(); });
