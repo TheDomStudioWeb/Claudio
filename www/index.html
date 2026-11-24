@@ -1799,7 +1799,7 @@ async function terminarReunion(){
 
 
 /* ---------- Informe de reunión: transcribe con Gemini, resume y guarda ---------- */
-const GEM_MODELS = ['gemini-3.8-flash', 'gemini-flash-latest'];   // 2.5 flash retirado por Google
+const GEM_MODELS = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-pro-latest'];   // 2.5 flash retirado por Google; los que no existan (404) se saltean
 let gemOk = ''; try { gemOk = localStorage.getItem('claudio.gemModel') || ''; } catch {}
 if (gemOk && !GEM_MODELS.includes(gemOk)){ gemOk = ''; try { localStorage.removeItem('claudio.gemModel'); } catch {} }
 let procOn = false, ultimoInforme = '';
@@ -1815,12 +1815,13 @@ function b64utf8(txt){
 async function gemini(parts, maxTok){
   const body = {contents:[{role:'user', parts}], generationConfig:{temperature:0.2, maxOutputTokens:maxTok || 32000}};
   const modelos = gemOk ? [gemOk, ...GEM_MODELS.filter(m => m !== gemOk)] : GEM_MODELS;
-  let ultimo = '', real = '';                          // real = el error que importa (no un 404 de modelo retirado)
+  let ultimo = '', real = ''; const errores = [];      // real = el error que importa (no un 404 de modelo retirado)
+  const ESPERAS = [8000, 20000, 45000, 75000];         // saturación (503) o cuota (429): esperar cada vez más
   for (const modelo of modelos){
-    for (let k = 0; k < 3; k++){
+    for (let k = 0; k <= ESPERAS.length; k++){
       let r;
       try { r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {method:'POST', headers:{'content-type':'application/json','x-goog-api-key':cfg.gem}, body:JSON.stringify(body)}); }
-      catch (e){ ultimo = real = modelo + ': sin conexión'; await pausa(4000 * (k + 1)); continue; }
+      catch (e){ ultimo = real = modelo + ': sin conexión'; if (k < ESPERAS.length) await pausa(ESPERAS[k]); continue; }
       if (r.ok){
         const j = await r.json(); const c = j.candidates && j.candidates[0];
         const t = ((c && c.content && c.content.parts) || []).map(x => x.text || '').join('');
@@ -1833,11 +1834,15 @@ async function gemini(parts, maxTok){
       ultimo = modelo + ': ' + r.status + ' ' + tx.slice(0, 300);
       if (r.status === 404){ if (gemOk === modelo){ gemOk = ''; try { localStorage.removeItem('claudio.gemModel'); } catch {} } break; }   // modelo retirado: probar el siguiente
       real = ultimo;
-      if (r.status === 429 || r.status >= 500){ await pausa(5000 * (k + 1)); continue; }
+      if (r.status === 429 || r.status >= 500){
+        if (k < ESPERAS.length){ procMsg('Gemini está saturado (' + modelo + '). Reintento ' + (k + 1) + ' de ' + ESPERAS.length + ' en ' + Math.round(ESPERAS[k] / 1000) + ' s… (dejá Claudio abierto)'); await pausa(ESPERAS[k]); }
+        continue;
+      }
       const e = new Error('Gemini ' + ultimo); e.status = r.status; throw e;
     }
+    if (real && !errores.includes(real)) errores.push(real);
   }
-  const motivo = real || ultimo;
+  const motivo = errores.length > 1 ? errores.map(x => x.split(' ').slice(0, 2).join(' ')).join(' · ') : (real || ultimo);
   const pista = /\b429\b/.test(motivo) ? ' (cuota o límite de uso de la clave de Gemini: esperá unos minutos o revisá el plan en Google AI Studio)'
     : /\b(500|503)\b/.test(motivo) ? ' (Gemini está saturado: probá de nuevo en un rato)' : '';
   throw new Error('Gemini: ' + motivo + pista);
