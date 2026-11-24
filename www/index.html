@@ -1799,8 +1799,9 @@ async function terminarReunion(){
 
 
 /* ---------- Informe de reunión: transcribe con Gemini, resume y guarda ---------- */
-const GEM_MODELS = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+const GEM_MODELS = ['gemini-3.8-flash', 'gemini-flash-latest'];   // 2.5 flash retirado por Google
 let gemOk = ''; try { gemOk = localStorage.getItem('claudio.gemModel') || ''; } catch {}
+if (gemOk && !GEM_MODELS.includes(gemOk)){ gemOk = ''; try { localStorage.removeItem('claudio.gemModel'); } catch {} }
 let procOn = false, ultimoInforme = '';
 const procLS = () => { try { return JSON.parse(localStorage.getItem('claudio.proc') || '{}'); } catch { return {}; } };
 const procSave = o => { try { localStorage.setItem('claudio.proc', JSON.stringify(o)); } catch {} };
@@ -1814,12 +1815,12 @@ function b64utf8(txt){
 async function gemini(parts, maxTok){
   const body = {contents:[{role:'user', parts}], generationConfig:{temperature:0.2, maxOutputTokens:maxTok || 32000}};
   const modelos = gemOk ? [gemOk, ...GEM_MODELS.filter(m => m !== gemOk)] : GEM_MODELS;
-  let ultimo = '';
+  let ultimo = '', real = '';                          // real = el error que importa (no un 404 de modelo retirado)
   for (const modelo of modelos){
     for (let k = 0; k < 3; k++){
       let r;
       try { r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + modelo + ':generateContent', {method:'POST', headers:{'content-type':'application/json','x-goog-api-key':cfg.gem}, body:JSON.stringify(body)}); }
-      catch (e){ ultimo = 'sin conexión'; await pausa(4000 * (k + 1)); continue; }
+      catch (e){ ultimo = real = modelo + ': sin conexión'; await pausa(4000 * (k + 1)); continue; }
       if (r.ok){
         const j = await r.json(); const c = j.candidates && j.candidates[0];
         const t = ((c && c.content && c.content.parts) || []).map(x => x.text || '').join('');
@@ -1827,14 +1828,19 @@ async function gemini(parts, maxTok){
         gemOk = modelo; try { localStorage.setItem('claudio.gemModel', modelo); } catch {}
         return t;
       }
-      const tx = (await r.text()).slice(0, 220);
-      ultimo = modelo + ': ' + r.status + ' ' + tx;
-      if (r.status === 404) break;                       // modelo retirado: probar el siguiente
+      const raw = await r.text(); let tx = raw;
+      try { tx = (JSON.parse(raw).error || {}).message || raw; } catch {}
+      ultimo = modelo + ': ' + r.status + ' ' + tx.slice(0, 300);
+      if (r.status === 404){ if (gemOk === modelo){ gemOk = ''; try { localStorage.removeItem('claudio.gemModel'); } catch {} } break; }   // modelo retirado: probar el siguiente
+      real = ultimo;
       if (r.status === 429 || r.status >= 500){ await pausa(5000 * (k + 1)); continue; }
       const e = new Error('Gemini ' + ultimo); e.status = r.status; throw e;
     }
   }
-  throw new Error('Gemini: ' + ultimo);
+  const motivo = real || ultimo;
+  const pista = /\b429\b/.test(motivo) ? ' (cuota o límite de uso de la clave de Gemini: esperá unos minutos o revisá el plan en Google AI Studio)'
+    : /\b(500|503)\b/.test(motivo) ? ' (Gemini está saturado: probá de nuevo en un rato)' : '';
+  throw new Error('Gemini: ' + motivo + pista);
 }
 async function transcribirParte(b64, num, total, previo, inicio){
   const prompt = 'Transcribí este audio completo en español, tal cual se dice, sin resumir ni omitir. Indicá quién habla como "Hablante 1", "Hablante 2", etc. y poné la marca de tiempo [mm:ss] al comenzar cada intervención, contada desde el inicio de esta parte. Si los participantes se presentan por su nombre y podés asociar cada voz con seguridad, escribí "Nombre (Hablante N)"; si no estás seguro, dejá solo "Hablante N". Si algo no se entiende, escribí [inaudible]; no inventes.'
